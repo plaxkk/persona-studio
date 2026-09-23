@@ -5,6 +5,20 @@ export function allowedRoute(path, method) {
   const [pathname, query] = path.split("?");
   if (query && (method !== "GET" || !["/memory", "/events"].includes(pathname)))
     return false;
+  if (
+    method === "GET" &&
+    /^\/persona-imports(?:\/(?:preflight|[a-f0-9]{32}(?:\/export)?))?$/.test(
+      pathname,
+    )
+  )
+    return true;
+  if (
+    method === "POST" &&
+    /^\/persona-imports(?:\/[a-f0-9]{32}\/(?:pause|resume|cancel|analyze|apply|delete))?$/.test(
+      pathname,
+    )
+  )
+    return true;
   if (method === "GET")
     return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|interactions|messages|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/versions)?|events|diagnostics)$/.test(
       pathname,
@@ -61,7 +75,7 @@ export async function desktopMessage(message, sender) {
     return { ok: false, code: "size", message: "内容过大。" };
   // Disconnect locally even when the backend is offline; never retain a reusable
   // browser capability after the user requests revocation.
-  if (path === '/auth/logout') await chrome.storage.session.remove('device');
+  if (path === "/auth/logout") await chrome.storage.session.remove("device");
   try {
     const response = await fetch(device.local + "/api/v1" + path, {
       method,

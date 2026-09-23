@@ -23,6 +23,10 @@ export async function api<T = Record<string, unknown>>(
           ),
         );
       if (path === "/auth/logout" && reply.ok) return reply.data as T;
+      if (reply.code === "forbidden" && path.startsWith("/persona-imports"))
+        throw new Error(
+          "连接助手版本较旧，请更新到 1.3 并重新加载扩展，再授权连接。",
+        );
       throw new Error(reply.message || "本机连接已断开，请重新授权。");
     }
     if ((reply.status || 500) >= 400)

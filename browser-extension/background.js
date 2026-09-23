@@ -1,3 +1,4 @@
+import "./persona-browser.js";
 import { CLOUD_ORIGIN, desktopMessage } from "./desktop.js";
 // Credentials travel directly from Chrome's cookie API to the authorized local server.
 // They are never returned to a web page, logged, or persisted by this extension.

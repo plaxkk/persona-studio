@@ -11,6 +11,21 @@ CLOUD_ORIGIN = "https://persona-studio-plaxkk.vercel.app"
 
 
 def desktop_route(path, method):
+    if (
+        re.fullmatch(
+            r"/api/v1/persona-imports(?:/(?:preflight|[a-f0-9]{32}(?:/export)?))?", path
+        )
+        and method == "GET"
+    ):
+        return True
+    if (
+        re.fullmatch(
+            r"/api/v1/persona-imports(?:/[a-f0-9]{32}/(?:pause|resume|cancel|analyze|apply|delete))?",
+            path,
+        )
+        and method == "POST"
+    ):
+        return True
     if method == "GET":
         return bool(
             re.fullmatch(

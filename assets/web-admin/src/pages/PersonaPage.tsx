@@ -1,3 +1,4 @@
+import PersonaImport from "../components/PersonaImport";
 import { useState } from "react";
 import { Send, Save, Upload, Sparkles } from "lucide-react";
 import { api } from "../api";
@@ -13,7 +14,10 @@ export default function PersonaPage({
   const [form, setForm] = useState<Persona>(data.overview.persona),
     [chat, setChat] = useState(""),
     [feedback, setFeedback] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [versions, setVersions] = useState<{ version: number; body: Persona }[]>(
+      [],
+    );
   const pending = data.overview.tasks.some(
     (t) => t.kind === "chat" && ["queued", "running"].includes(t.status),
   );
@@ -24,9 +28,34 @@ export default function PersonaPage({
         description="决定它关心什么、如何表达，再用聊天慢慢找到它的声音。"
         action={<Badge>虚构 AI 人格 · v{form.version}</Badge>}
       />
+      <PersonaImport actions={actions} onApply={setForm} />
       <div className="persona-grid">
         <section className="surface">
           <h2>人格设定</h2>
+          <details>
+            <summary
+              onClick={() =>
+                void api<{ version: number; body: Persona }[]>(
+                  "/persona/versions",
+                ).then(setVersions)
+              }
+            >
+              查看历史版本与回退
+            </summary>
+            <p className="muted">
+              选择旧版本可载入下方表单，检查后点击“保存人格”。历史版本仍保留，已导入的风格语料可在内容资料中另行管理。
+            </p>
+            {versions
+              .filter((v) => v.version !== form.version)
+              .map((v) => (
+                <Button
+                  key={v.version}
+                  onClick={() => setForm({ ...v.body, version: form.version })}
+                >
+                  载入 v{v.version}
+                </Button>
+              ))}
+          </details>
           <form
             className="form-stack"
             onSubmit={(e) => {

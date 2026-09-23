@@ -521,6 +521,8 @@ def create_app(state_dir=None, public_url=None):
             store.event(
                 "pause", "已暂停同步与生成" if body.paused else "已恢复同步与生成", c=c
             )
+        if body.paused:
+            app.state.persona_imports.pause_all()
         return {"paused": body.paused}
 
     @app.get("/api/v1/persona", dependencies=[Depends(session)])
@@ -1000,6 +1002,10 @@ def create_app(state_dir=None, public_url=None):
             "live_x_writes": False,
             "intent_prefill_verified": False,
         }
+
+    from .persona_routes import register
+
+    register(app, store, session, allowed_hosts)
 
     static = ROOT / "assets/web-admin/dist"
     if (static / "assets").exists():

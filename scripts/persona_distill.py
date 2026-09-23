@@ -131,7 +131,8 @@ def redact(text: str) -> str:
 def normalize_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = re.sub(r"https?://\S+", "[URL]", text)
-    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = "\n".join(line.strip() for line in text.split("\n")).strip()
     return redact(text)
 
 

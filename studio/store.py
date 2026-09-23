@@ -153,6 +153,19 @@ class Store:
         target = folder / f"studio-{time.time_ns()}.sqlite3"
         with sqlite3.connect(self.path) as src, sqlite3.connect(target) as dst:
             src.backup(dst)
+            # Transient browser material must not outlive its seven-day policy
+            # through routine studio backups. Applied memories/versions remain.
+            if dst.execute(
+                "SELECT 1 FROM sqlite_master WHERE name='persona_imports'"
+            ).fetchone():
+                dst.execute("PRAGMA secure_delete=ON")
+                dst.execute("DELETE FROM persona_sources")
+                dst.execute("DELETE FROM persona_browser_actions")
+                dst.execute(
+                    "UPDATE persona_imports SET profile='{}', status=CASE WHEN status='applied' THEN status ELSE 'cancelled' END,message='备份不包含临时采集材料。'"
+                )
+                dst.commit()
+                dst.execute("VACUUM")
         target.chmod(0o600)
         return target
 

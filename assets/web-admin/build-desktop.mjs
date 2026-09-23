@@ -7,6 +7,8 @@ const names = [
   "manifest.json",
   "background.js",
   "desktop.js",
+  "persona-browser.js",
+  "persona-page.js",
   "popup.js",
   "popup.html",
   "popup.css",

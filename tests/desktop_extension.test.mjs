@@ -5,6 +5,9 @@ test('route allowlist rejects secrets, traversal and arbitrary commands',()=>{
   for(const path of ['/connections/x','/engines/hermes','/auth/setup','/../.env','/%2e%2e/.env','//evil.example','/shell']) assert.equal(allowedRoute(path,'PUT'),false);
   assert.equal(allowedRoute('/drafts/abc-123','PUT'),true);
   assert.equal(allowedRoute('/generate','POST'),true);
+  assert.equal(allowedRoute('/persona-imports','POST'),true);
+  assert.equal(allowedRoute('/persona-browser','POST'),false);
+  assert.equal(allowedRoute('/persona-imports/0123456789abcdef0123456789abcdef/evidence','POST'),false);
 });
 test('disconnect forgets capability even while local backend is offline',async()=>{
   let removed=false;

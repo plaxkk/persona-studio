@@ -55,6 +55,8 @@ class BrowserConnection:
                 for name in [
                     "manifest.json",
                     "desktop.js",
+                    "persona-browser.js",
+                    "persona-page.js",
                     "background.js",
                     "popup.html",
                     "popup.js",
