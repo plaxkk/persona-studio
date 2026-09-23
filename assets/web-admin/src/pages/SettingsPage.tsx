@@ -24,6 +24,17 @@ function EngineCard({
   const [model, setModel] = useState(engine.config.model || ""),
     [url, setUrl] = useState(engine.config.base_url || ""),
     [key, setKey] = useState("");
+  const missing = [
+    !engine.config.model?.trim() && "模型名称",
+    !engine.config.base_url?.trim() && "接口地址",
+    !engine.key_present && "API Key",
+  ].filter(Boolean);
+  const configured = missing.length === 0;
+  const unsaved =
+    !desktopMode &&
+    (model !== (engine.config.model || "") ||
+      url !== (engine.config.base_url || "") ||
+      key.length > 0);
   if (!engine.supported)
     return (
       <div className="engine-planned">
@@ -36,9 +47,11 @@ function EngineCard({
       <div className="section-title">
         <h3>{engine.id === "hermes" ? "Hermes" : "OpenClaw"}</h3>
         {active ? (
-          <Badge tone="green">
+          <Badge tone={engine.status === "ready" && configured ? "green" : ""}>
             <Check size={13} />
-            正在使用
+            {engine.status === "ready" && configured
+              ? "正在使用"
+              : "已选择 · 尚未就绪"}
           </Badge>
         ) : (
           <Badge>{engine.installed ? label(engine.status) : "未安装"}</Badge>
@@ -53,7 +66,11 @@ function EngineCard({
       {desktopMode ? (
         <p className="description">
           模型配置和密钥请在{" "}
-          <a href="http://127.0.0.1:18880" target="_blank" rel="noreferrer">
+          <a
+            href="http://127.0.0.1:18880/#settings/engines"
+            target="_blank"
+            rel="noreferrer"
+          >
             本机设置
           </a>
           中修改。
@@ -118,9 +135,18 @@ function EngineCard({
           </Button>
         </form>
       )}
+      {!configured && (
+        <p className="help-box" role="status">
+          还需配置：{missing.join("、")}。安装引擎后，还需连接它使用的模型。
+          {desktopMode
+            ? "请打开上方本机设置，保存后再回来测试连接。"
+            : "请填写上方信息并保存，再测试连接。"}
+        </p>
+      )}
+      {unsaved && <p className="muted">配置有未保存的修改，请先保存再测试。</p>}
       <div className="actions spaced-small">
         <Button
-          disabled={!engine.installed}
+          disabled={!engine.installed || !configured || unsaved}
           onClick={() =>
             void actions.run(
               () => api("/engines/" + engine.id + "/verify", "POST", {}),
@@ -133,7 +159,7 @@ function EngineCard({
         </Button>
         {!active && (
           <Button
-            disabled={engine.status !== "ready"}
+            disabled={engine.status !== "ready" || !configured || unsaved}
             onClick={() =>
               void actions.run(
                 () => api("/engines/" + engine.id + "/select", "POST", {}),
@@ -172,7 +198,9 @@ export default function SettingsPage({
   actions: Actions;
 }) {
   const s = data.overview.settings;
-  const [tab, setTab] = useState("connections"),
+  const [tab, setTab] = useState(
+      window.location.hash === "#settings/engines" ? "engines" : "connections",
+    ),
     [username, setUsername] = useState(data.connections.x.username),
     [auth, setAuth] = useState(""),
     [ct0, setCt0] = useState(""),

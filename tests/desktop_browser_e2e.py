@@ -2,6 +2,8 @@
 
 import asyncio
 import mimetypes
+import json
+from studio.security import Secrets
 import shutil
 from deployment.install_browser_connector import install
 import tempfile
@@ -151,6 +153,56 @@ async def main():
                 ).to_be_visible()
                 assert await web.locator("input[type=password]").count() == 0
                 await web.get_by_role("button", name="写作引擎", exact=True).click()
+                # Missing model config cannot look ready or dispatch a futile probe.
+                await expect(
+                    web.get_by_text("已选择 · 尚未就绪", exact=True)
+                ).to_be_visible()
+                for button in await web.get_by_role(
+                    "button", name="测试连接", exact=True
+                ).all():
+                    await expect(button).to_be_disabled()
+                await expect(
+                    web.get_by_text("还需配置：", exact=False).first
+                ).to_be_visible()
+                await expect(
+                    web.get_by_role("link", name="本机设置").first
+                ).to_have_attribute("href", "http://127.0.0.1:18880/#settings/engines")
+                with app.state.store.db() as c:
+                    c.execute(
+                        "UPDATE engines SET config=?",
+                        (
+                            json.dumps(
+                                {
+                                    "model": "fixture-model",
+                                    "base_url": "https://fixture.invalid/v1",
+                                }
+                            ),
+                        ),
+                    )
+                Secrets(app.state.store.root).update(
+                    {
+                        "ENGINE_HERMES_API_KEY": "fixture-only",
+                        "ENGINE_OPENCLAW_API_KEY": "fixture-only",
+                    }
+                )
+                await expect(
+                    web.get_by_role("button", name="切换到此引擎")
+                ).to_be_enabled(timeout=10000)
+                # Local configuration links land directly on engine settings after login.
+                localpage = await context.new_page()
+                await localpage.goto("http://127.0.0.1:18482/#settings/engines")
+                await expect(localpage.get_by_label("hermes 模型名称")).to_be_visible()
+                localcard = localpage.locator("article").filter(
+                    has=localpage.get_by_role("heading", name="Hermes", exact=True)
+                )
+                await expect(
+                    localcard.get_by_role("button", name="测试连接", exact=True)
+                ).to_be_enabled()
+                await localpage.get_by_label("hermes 模型名称").fill("unsaved-model")
+                await expect(
+                    localcard.get_by_role("button", name="测试连接", exact=True)
+                ).to_be_disabled()
+                await localpage.close()
                 await web.get_by_role("button", name="切换到此引擎").click()
                 for _ in range(50):
                     if app.state.store.get("engine") == "openclaw":

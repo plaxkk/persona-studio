@@ -55,7 +55,9 @@ export default function App() {
     [password, setPassword] = useState(""),
     [confirm, setConfirm] = useState(""),
     [token, setToken] = useState(""),
-    [page, setPage] = useState<Page>("home"),
+    [page, setPage] = useState<Page>(
+      window.location.hash === "#settings/engines" ? "settings" : "home",
+    ),
     [data, setData] = useState<Studio | null>(null),
     [toast, setToast] = useState<{ text: string; error: boolean } | null>(null),
     [busy, setBusy] = useState(false),

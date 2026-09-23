@@ -27,8 +27,11 @@ assert python.is_file(), "Run Python environment setup first"
 logs = state / "logs"
 logs.mkdir(mode=0o700, exist_ok=True)
 env = {
-    "PATH": str(Path.home() / ".local/bin")
-    + ":/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin",
+    "PATH": ":".join(dict.fromkeys([
+        str(Path(shutil.which("node")).parent) if shutil.which("node") else "/usr/local/bin",
+        str(Path.home() / ".local/bin"),
+        "/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin",
+    ])),
     "STUDIO_STATE_DIR": str(state),
     "STUDIO_PORT": str(args.port),
     "PYTHONUTF8": "1",
