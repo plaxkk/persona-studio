@@ -10,6 +10,8 @@ description: |
 
 # Another Person in X
 
+> 本工作区已改为“人格工作室”人工发布产品。本文件以下是上游旧自动化说明，仅供历史参考，不作为新版部署入口。执行新版任务请遵循根 README.md 和 docs/DEPLOYMENT.md；不得启动旧发送或自动化调度服务。
+
 This skill turns desktop Codex or Claude Code into the deployment and maintenance engineer for an OpenClaw runtime persona bot. Strongly prefer desktop Codex for real deployments. OpenClaw should run the agent; Codex/Claude Code should install, debug, migrate, and repair it.
 
 ## Core Rules

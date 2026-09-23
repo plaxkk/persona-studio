@@ -22,8 +22,11 @@ def api_json(base: str, path: str, payload: Dict[str, Any], token: str = "") -> 
 
 def random_times(day: datetime, count: int, start_hour: int, end_hour: int, seed: int | None) -> list[int]:
     rng = random.Random(seed)
-    start = day.replace(hour=start_hour, minute=0, second=0, microsecond=0)
-    end = day.replace(hour=end_hour, minute=0, second=0, microsecond=0)
+    if day.tzinfo is None:raise ValueError('timezone-aware date required')
+    if count < 0 or not 0 <= start_hour < 48 or not 0 <= end_hour < 48:raise ValueError('invalid schedule')
+    midnight = day.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = midnight + timedelta(hours=start_hour)
+    end = midnight + timedelta(hours=end_hour)
     if end <= start:
         end += timedelta(days=1)
     span = int((end - start).total_seconds())

@@ -22,7 +22,7 @@ DEFAULT_FEATURES = {
     "repost": True,
     "quote": True,
     "follow": True,
-    "shadow_mode": False,
+    "shadow_mode": True,
     "read_only": False,
     "pause_all": False,
 }

@@ -282,6 +282,10 @@ def main() -> int:
                 updates.update(extract_cookie_string_values(cookie_string))
 
     if not updates:
+        if args.generate_admin_token and existing_values.get("FACTORY_ADMIN_TOKEN"):
+            env_path.chmod(0o600)
+            print("Admin token already configured; retained without displaying it.")
+            return 0
         print("No secrets provided. Use --interactive, CLI flags, or --cookie-editor-json.", file=sys.stderr)
         return 2
 

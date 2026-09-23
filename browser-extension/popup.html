@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  /><title>连接人格工作室</title
+  ><link rel="stylesheet" href="popup.css" />
+  <body>
+    <h1>连接你的 X 账号</h1>
+    <p>
+      授权后，打开本机工作室会自动连接当前浏览器登录的 X 账号；未登录时引导你在
+      X 登录。
+    </p>
+    <p>
+      仅传送 auth_token 与 ct0
+      至下方本机地址，保存在你的电脑。不会读取其他网站或自动发帖。
+    </p>
+    <label for="origin">工作室地址</label
+    ><input id="origin" value="http://127.0.0.1:18880" type="url" />
+    <button id="allow">允许连接并打开工作室</button
+    ><button id="revoke" class="secondary">停止自动连接</button>
+    <p id="status" role="status"></p>
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

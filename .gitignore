@@ -20,3 +20,15 @@ sessions/
 post_schedule.json
 seen_replies.json
 autopilot_actions.jsonl
+
+# Local isolated deployment and private runtime state
+.venv/
+.runtime/
+.local/
+
+*.sqlite3-wal
+*.sqlite3-shm
+.pytest_cache/
+
+# Hosting links and provider credentials
+.vercel/

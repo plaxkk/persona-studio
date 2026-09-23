@@ -1,0 +1,38 @@
+body {
+  width: 320px;
+  padding: 20px;
+  margin: 0;
+  background: #f6f7f2;
+  color: #263d33;
+  font:
+    14px/1.7 system-ui,
+    sans-serif;
+}
+h1 {
+  font-size: 21px;
+}
+p {
+  color: #516359;
+}
+input,
+button {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 11px;
+  border-radius: 8px;
+  border: 1px solid #cad3c8;
+  margin-top: 9px;
+  font: inherit;
+}
+button {
+  background: #244d3b;
+  color: white;
+  cursor: pointer;
+}
+.secondary {
+  background: white;
+  color: #244d3b;
+}
+#status {
+  min-height: 24px;
+}

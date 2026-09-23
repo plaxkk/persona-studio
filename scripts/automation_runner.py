@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import random
 import subprocess
@@ -250,18 +251,7 @@ def action_desires(item: Dict[str, Any]) -> Dict[str, int]:
 
 def rank_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not items:
-        return [
-            {
-                "id": "dry-run-target",
-                "text": "dry-run high relevance followed timeline item",
-                "source": "get_latest_timeline",
-                "source_rank": 100,
-                "persona_score": 32,
-                "priority_score": 100032,
-                "persona_hits": ["timeline", "persona"],
-                "user": {"screen_name": "example"},
-            }
-        ]
+        return []
     try:
         script_dir = Path(__file__).resolve().parent
         if str(script_dir) not in sys.path:
@@ -270,7 +260,7 @@ def rank_items(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
         return rank_browse_candidates(items)
     except Exception:
-        return items
+        return []  # Fail closed: never return unfiltered candidates.
 
 
 def generate_browse_candidates(
@@ -501,7 +491,7 @@ def run_adapter(script_dir: Path, candidate: Candidate, dry_run: bool) -> Dict[s
 def main() -> int:
     parser = argparse.ArgumentParser(description="Limited autonomous action runner for OpenClaw Agent Factory.")
     parser.add_argument("--admin-api", default="http://127.0.0.1:18880")
-    parser.add_argument("--admin-token", default="")
+    parser.add_argument("--admin-token", default=os.environ.get("FACTORY_ADMIN_TOKEN", ""))
     parser.add_argument("--kind", choices=["post", "browse"], default="post")
     parser.add_argument("--browse-input", default="", help="JSON list of ranked or unranked timeline candidates.")
     parser.add_argument("--max-browse-items", type=int, default=3)

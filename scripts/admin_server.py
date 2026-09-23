@@ -27,7 +27,7 @@ DEFAULT_FEATURES = {
     "repost": True,
     "quote": True,
     "follow": True,
-    "shadow_mode": False,
+    "shadow_mode": True,
     "read_only": False,
     "pause_all": False,
 }
@@ -267,7 +267,7 @@ def init_db() -> None:
 
 def require_admin(authorization: str = Header(default="")) -> None:
     if not ADMIN_TOKEN:
-        return
+        raise HTTPException(status_code=503, detail="admin token is not configured")
     if authorization != f"Bearer {ADMIN_TOKEN}":
         raise HTTPException(status_code=401, detail="invalid admin token")
 
@@ -351,6 +351,8 @@ def make_app() -> FastAPI:
     def update_feature(patch: FeaturePatch) -> Dict[str, Any]:
         if patch.key not in DEFAULT_FEATURES:
             raise HTTPException(status_code=404, detail="unknown feature")
+        if patch.key == "shadow_mode" and not patch.enabled and os.environ.get("FACTORY_LIVE_ENABLED", "0") != "1":
+            raise HTTPException(status_code=409, detail="live activation requires deployment owner confirmation")
         with db() as conn:
             set_config(conn, patch.key, patch.enabled)
         return {"ok": True}
@@ -423,7 +425,7 @@ def make_app() -> FastAPI:
             row = conn.execute("SELECT enabled FROM owners WHERE kind=? AND value=?", (kind, value)).fetchone()
         return {"owner": bool(row and row["enabled"])}
 
-    @app.post("/api/audit")
+    @app.post("/api/audit", dependencies=[Depends(require_admin)])
     async def add_audit(item: AuditIn, request: Request) -> Dict[str, Any]:
         with db() as conn:
             conn.execute(
@@ -527,9 +529,10 @@ def make_app() -> FastAPI:
         digest.update({"query": item.query, "persona_slug": item.persona_slug})
         return digest
 
-    @app.post("/api/rate/check")
+    @app.post("/api/rate/check", dependencies=[Depends(require_admin)])
     def rate_check(item: RateCheckIn) -> Dict[str, Any]:
         with db() as conn:
+            conn.execute("BEGIN IMMEDIATE")
             cfg = read_config(conn)
             if cfg.get("pause_all"):
                 return {"ok": False, "reason": "pause_all"}
@@ -537,7 +540,7 @@ def make_app() -> FastAPI:
                 return {"ok": False, "reason": "read_only"}
             limit_key = RATE_COUNTERS.get(item.action)
             if not limit_key:
-                return {"ok": True, "reason": "unlimited_action"}
+                return {"ok": False, "reason": "unknown_action"}
             limit = int(cfg.get(limit_key, DEFAULT_LIMITS[limit_key]))
             since = int(time.time()) - window_seconds(item.action, item.window)
             count = conn.execute("SELECT COUNT(*) AS n FROM rate_events WHERE action=? AND ts>=?", (item.action, since)).fetchone()["n"]
@@ -546,7 +549,7 @@ def make_app() -> FastAPI:
                 conn.execute("INSERT INTO rate_events(ts, action, actor) VALUES (?, ?, ?)", (int(time.time()), item.action, item.actor))
             return {"ok": ok, "limit": limit, "used": count + (1 if ok and item.increment else 0), "reason": "ok" if ok else "rate_limited"}
 
-    @app.post("/api/pending")
+    @app.post("/api/pending", dependencies=[Depends(require_admin)])
     def add_pending(item: PendingIn) -> Dict[str, Any]:
         with db() as conn:
             conn.execute(

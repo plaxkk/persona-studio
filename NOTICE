@@ -1,0 +1,10 @@
+人格工作室 / Persona Studio
+Derived from NoMTF/Another-Person-in-X
+https://github.com/NoMTF/Another-Person-in-X
+Upstream revision: 7ff69fe409e75341ef987aaf45b7f4d91f4d09c3
+Copyright (c) 2026 NoMTF — MIT License, retained in LICENSE.
+
+This derivative introduces a human-published workflow, isolated writing engines,
+a read-only X application boundary, persistent tasks, and a new Chinese Web UI.
+Legacy automation code and its documentation are retained as upstream material
+and are not entry points for the Persona Studio production services.

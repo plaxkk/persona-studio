@@ -6,6 +6,7 @@ import json
 import os
 import sqlite3
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -130,10 +131,17 @@ def bridge_summary(state_dir: Path) -> Dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Redacted health check for OpenClaw Agent Factory profiles.")
     parser.add_argument("--state-dir", required=True)
+    parser.add_argument("--runtime", choices=["openclaw", "hermes"], default="openclaw")
     parser.add_argument("--service", default="")
     parser.add_argument("--env-file", default="")
     parser.add_argument("--x-api", default="", help="Optional local X tools API base URL, for example http://127.0.0.1:8787.")
     args = parser.parse_args()
+
+    if args.runtime == "hermes":
+        expected = Path(__file__).resolve().parents[1] / ".local/state"
+        if Path(args.state_dir).resolve() != expected.resolve():
+            parser.error("Hermes local health check requires this deployment's .local/state")
+        return subprocess.call([sys.executable, str(expected.parents[1] / "deployment/verify_local.py")])
 
     state_dir = Path(args.state_dir)
     env = parse_env(Path(args.env_file) if args.env_file else state_dir / ".env")
