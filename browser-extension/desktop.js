@@ -59,6 +59,9 @@ export async function desktopMessage(message, sender) {
     message.body === undefined ? undefined : JSON.stringify(message.body);
   if (payload && new TextEncoder().encode(payload).length > 1100000)
     return { ok: false, code: "size", message: "内容过大。" };
+  // Disconnect locally even when the backend is offline; never retain a reusable
+  // browser capability after the user requests revocation.
+  if (path === '/auth/logout') await chrome.storage.session.remove('device');
   try {
     const response = await fetch(device.local + "/api/v1" + path, {
       method,

@@ -55,3 +55,5 @@ Chrome Manifest V3 扩展，授权指定 loopback origin 后使用官方 cookies
 全套 Python 测试累计 81 项通过；新增设备会话、来源/路径/方法白名单、过期、撤销、授权替换和密码限流覆盖。Chrome 扩展的带设备令牌 GET 请求可能不携带 Origin，服务端允许这一情况；有 Origin 时必须为固定扩展来源，写入始终严格校验来源，浏览器网页直连仍被跨域边界拒绝。
 
 `tests/desktop_browser_e2e.py` 用真实隔离 Chromium 扩展和临时数据库验证：HTTPS 面板授权、本机保存 Unicode 草稿、模拟本机 Agent 试聊、切换引擎、暂停、拒绝密钥管理/路径穿越、实际停止和重启临时后端后的重连与编辑保留、撤销、桌面/移动布局。检测到的云站点请求全部为 GET 静态资源，无云端 API 请求。生产尚未配置的真实模型仍标为“待配置”。
+
+正式 Vercel 地址 `https://persona-studio-plaxkk.vercel.app` 已通过静态页面、安全响应头与扩展 ZIP 检查，并用实际线上页面 + 隔离 Chromium 扩展 + 临时本机后端完成整体验收。设备域名已永久绑定项目，GitHub 仓库已关联 Vercel。新增 2 项 Node 测试验证扩展路由白名单与离线断开时清除授权。仍不把模拟引擎结果视为真实模型已配置。
