@@ -18,6 +18,10 @@
 
 X cookies 本身有写入权限；本产品通过读取模块隔离、不暴露写入方法、禁用模型工具限制行为，不能把它们称为只读凭据。X 搜索和通知不保证完整覆盖互动，界面会显示各来源成功时间与失败状态。
 
+## 在线面板连接本机
+
+访问 https://persona-studio-plaxkk.vercel.app，安装连接助手 1.1 并在扩展内授权本机管理员账号。网页托管于 Vercel，Agent、数据库和凭据继续留在你的电脑。详见 [在线面板与本机连接说明](docs/DESKTOP_WEB.md)。
+
 ## 本机安装与部署
 
 Python 3.11+、Node.js 22+；建议使用 Python 3.13、Node.js 24。SQLite 随 Python 提供，不需要 Docker。

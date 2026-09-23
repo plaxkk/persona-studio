@@ -1,3 +1,4 @@
+import { desktopMode } from "../desktop";
 import { useEffect, useState } from "react";
 import {
   Check,
@@ -49,64 +50,74 @@ function EngineCard({
           : "未检测到引擎，请按部署指引安装后重试"}{" "}
         · {label(engine.status)}
       </p>
-      <form
-        className="form-stack"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void actions.run(async () => {
-            await api("/engines/" + engine.id, "PUT", {
-              model,
-              base_url: url,
-              api_key: key,
-            });
-            setKey("");
-          }, "已保存，请测试连接");
-        }}
-      >
-        <Field label={engine.id + " 模型名称"}>
-          <input
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder="模型 ID"
-            required
-          />
-        </Field>
-        <Field
-          label={engine.id + " 模型接口地址"}
-          hint="OpenAI 兼容接口；远程地址使用 HTTPS。"
+      {desktopMode ? (
+        <p className="description">
+          模型配置和密钥请在{" "}
+          <a href="http://127.0.0.1:18880" target="_blank" rel="noreferrer">
+            本机设置
+          </a>
+          中修改。
+        </p>
+      ) : (
+        <form
+          className="form-stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void actions.run(async () => {
+              await api("/engines/" + engine.id, "PUT", {
+                model,
+                base_url: url,
+                api_key: key,
+              });
+              setKey("");
+            }, "已保存，请测试连接");
+          }}
         >
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://…/v1"
-            required
-          />
-        </Field>
-        <Field
-          label={engine.id + " API Key"}
-          hint={
-            engine.key_present
-              ? "已保存；留空保持原值。"
-              : "仅保存在你的服务器，不会回显。"
-          }
-        >
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={key}
-            onChange={(e) => setKey(e.target.value)}
-            placeholder={
+          <Field label={engine.id + " 模型名称"}>
+            <input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="模型 ID"
+              required
+            />
+          </Field>
+          <Field
+            label={engine.id + " 模型接口地址"}
+            hint="OpenAI 兼容接口；远程地址使用 HTTPS。"
+          >
+            <input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…/v1"
+              required
+            />
+          </Field>
+          <Field
+            label={engine.id + " API Key"}
+            hint={
               engine.key_present
-                ? "已保存 · 如需更换请输入新值"
-                : "输入 API Key"
+                ? "已保存；留空保持原值。"
+                : "仅保存在你的服务器，不会回显。"
             }
-          />
-        </Field>
-        <Button type="submit">
-          <Save size={15} />
-          保存配置
-        </Button>
-      </form>
+          >
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              placeholder={
+                engine.key_present
+                  ? "已保存 · 如需更换请输入新值"
+                  : "输入 API Key"
+              }
+            />
+          </Field>
+          <Button type="submit">
+            <Save size={15} />
+            保存配置
+          </Button>
+        </form>
+      )}
       <div className="actions spaced-small">
         <Button
           disabled={!engine.installed}
@@ -137,7 +148,7 @@ function EngineCard({
       {engine.checked > 0 && (
         <small className="muted">最近测试：{time(engine.checked)}</small>
       )}
-      {engine.key_present && (
+      {!desktopMode && engine.key_present && (
         <button
           className="text-button danger spaced-small"
           onClick={() =>
@@ -202,7 +213,24 @@ export default function SettingsPage({
           </button>
         ))}
       </div>
-      {tab === "connections" && (
+      {tab === "connections" && desktopMode && (
+        <section className="surface">
+          <h2>账号连接保留在本机</h2>
+          <p>
+            X：{label(data.connections.x.status)} · @
+            {data.connections.x.username || "尚未连接"}
+          </p>
+          <p>Telegram：{label(data.connections.telegram.status)}</p>
+          <p>
+            请在{" "}
+            <a href="http://127.0.0.1:18880" target="_blank" rel="noreferrer">
+              本机工作室的设置页
+            </a>
+            管理 X、Telegram 和浏览器登录。在线面板不会读取 cookie 或模型密钥。
+          </p>
+        </section>
+      )}
+      {tab === "connections" && !desktopMode && (
         <div className="settings-grid">
           <section className="surface">
             <div className="section-title">

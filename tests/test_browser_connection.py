@@ -176,6 +176,7 @@ def test_archive_and_identity(client):
     with zipfile.ZipFile(io.BytesIO(r.content)) as z:
         assert set(z.namelist()) == {
             "manifest.json",
+            "desktop.js",
             "background.js",
             "popup.js",
             "popup.html",

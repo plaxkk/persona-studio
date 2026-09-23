@@ -1,3 +1,4 @@
+import { desktopMode, desktopCall } from "./desktop";
 let csrf = "";
 export function setCsrf(value: string) {
   csrf = value;
@@ -7,6 +8,27 @@ export async function api<T = Record<string, unknown>>(
   method = "GET",
   body?: unknown,
 ): Promise<T> {
+  if (desktopMode) {
+    const reply = await desktopCall({
+      type: "desktop.api",
+      path,
+      method,
+      body,
+    });
+    if (!reply.ok || reply.status === 401 || path === "/auth/logout") {
+      if (reply.code !== "forbidden" && reply.code !== "size")
+        window.dispatchEvent(
+          new Event(
+            path === "/auth/logout" ? "desktop-logout" : "desktop-disconnected",
+          ),
+        );
+      if (path === "/auth/logout" && reply.ok) return reply.data as T;
+      throw new Error(reply.message || "本机连接已断开，请重新授权。");
+    }
+    if ((reply.status || 500) >= 400)
+      throw new Error(reply.data?.detail?.message || "操作未完成，请重试。");
+    return reply.data as T;
+  }
   const response = await fetch("/api/v1" + path, {
     method,
     credentials: "same-origin",

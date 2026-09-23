@@ -1437,3 +1437,45 @@ summary {
     margin: 16px 16px 0;
   }
 }
+
+.desktop-gate {
+  max-width: 720px;
+  margin: 8vh auto;
+  padding: 32px;
+  line-height: 1.8;
+}
+.desktop-gate li {
+  margin: 12px 0;
+}
+.desktop-strip {
+  position: relative;
+  z-index: 50;
+  background: #244d3b;
+  color: white;
+  padding: 8px 20px;
+  text-align: right;
+  font-size: 13px;
+}
+.desktop-strip button {
+  margin-left: 12px;
+  background: transparent;
+  color: white;
+  border: 1px solid #9eb3a1;
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .desktop-gate {
+    margin: 20px;
+    padding: 24px;
+  }
+  .desktop-strip {
+    text-align: left;
+  }
+}
+
+.desktop-session { padding-top: 44px; }
+.desktop-strip { position: fixed; inset: 0 0 auto; height: 44px; display: flex; align-items: center; justify-content: flex-end; }
+.desktop-session .sidebar, .desktop-session .mobile-bar, .desktop-session .nav-overlay { top: 44px; }
+@media(max-width:760px){.desktop-strip{justify-content:flex-start;font-size:12px;padding:6px 12px;}}

@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { desktopMode } from "./desktop";
 import { api, setCsrf } from "./api";
 import type {
   Studio,
@@ -111,6 +112,34 @@ export default function App() {
   useEffect(() => {
     if (auth !== "ready") return;
     refresh().catch((e) => notify(e.message, true));
+    if (desktopMode) {
+      let polling = false,
+        available = true;
+      const disconnected = () => {
+        available = false;
+      };
+      const connected = () => {
+        available = true;
+        void refresh().catch(() => {});
+      };
+      window.addEventListener("desktop-disconnected", disconnected);
+      window.addEventListener("desktop-connected", connected);
+      const timer = setInterval(() => {
+        if (available && !polling && document.visibilityState === "visible") {
+          polling = true;
+          void refresh()
+            .catch(() => {})
+            .finally(() => {
+              polling = false;
+            });
+        }
+      }, 4000);
+      return () => {
+        clearInterval(timer);
+        window.removeEventListener("desktop-disconnected", disconnected);
+        window.removeEventListener("desktop-connected", connected);
+      };
+    }
     const stream = new EventSource("/api/v1/events/stream");
     let pending = false;
     const update = () => {
@@ -407,7 +436,7 @@ export default function App() {
               : "正在准备内容"}
           </span>
         </div>
-        {data && (
+        {data && !desktopMode && (
           <BrowserConnection visible={page === "settings"} actions={actions} />
         )}
         {data ? (

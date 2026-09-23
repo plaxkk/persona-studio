@@ -54,6 +54,7 @@ class BrowserConnection:
             with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
                 for name in [
                     "manifest.json",
+                    "desktop.js",
                     "background.js",
                     "popup.html",
                     "popup.js",

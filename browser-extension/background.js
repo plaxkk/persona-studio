@@ -1,3 +1,4 @@
+import { CLOUD_ORIGIN, desktopMessage } from "./desktop.js";
 // Credentials travel directly from Chrome's cookie API to the authorized local server.
 // They are never returned to a web page, logged, or persisted by this extension.
 export function localOrigin(value) {
@@ -133,6 +134,8 @@ async function tryConnect() {
 }
 chrome.runtime.onMessageExternal.addListener((message, sender, respond) => {
   (async () => {
+    if (sender.url && new URL(sender.url).origin === CLOUD_ORIGIN)
+      return desktopMessage(message, sender);
     const origin = localOrigin(sender.url);
     const config = await chrome.storage.local.get(["origin", "enabled"]);
     if (!origin || sender.frameId !== 0 || sender.tab?.incognito)

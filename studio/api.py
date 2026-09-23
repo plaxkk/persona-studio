@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ConfigDict
 from .browser_connection import BrowserConnection, PATH as BROWSER_COMPLETE
 from .browser_identity import EXTENSION_ORIGIN
+from .desktop import Desktop, desktop_route
 from .store import Store
 from .security import (
     Secrets,
@@ -154,6 +155,7 @@ def create_app(state_dir=None, public_url=None):
     store = Store(root)
     store.import_legacy()
     vault = Secrets(root)
+    desktop = Desktop(store)
     engines = Engines(store)
     jobs = Jobs(store)
     origin = (
@@ -212,6 +214,42 @@ def create_app(state_dir=None, public_url=None):
             and request.url.path == BROWSER_COMPLETE
             and request.headers.get("origin") == EXTENSION_ORIGIN
         )
+        if (
+            local
+            and request.method == "OPTIONS"
+            and request.headers.get("origin") == EXTENSION_ORIGIN
+            and (
+                request.url.path == "/api/v1/desktop/login"
+                or desktop_route(
+                    request.url.path,
+                    request.headers.get("access-control-request-method", ""),
+                )
+            )
+        ):
+            return JSONResponse(
+                {},
+                headers={
+                    "Access-Control-Allow-Origin": EXTENSION_ORIGIN,
+                    "Access-Control-Allow-Methods": "GET, POST, PUT",
+                    "Access-Control-Allow-Headers": "content-type, x-studio-device",
+                },
+            )
+        device_request = (
+            local
+            and (
+                request.headers.get("origin") == EXTENSION_ORIGIN
+                or (request.method == "GET" and request.headers.get("origin") is None)
+            )
+            and (
+                request.url.path == "/api/v1/desktop/login"
+                or bool(request.headers.get("x-studio-device"))
+            )
+        )
+        if device_request and request.url.path != "/api/v1/desktop/login":
+            try:
+                desktop.authenticate(request)
+            except HTTPException as exc:
+                return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
         if request.method == "OPTIONS" and browser_import:
             return JSONResponse(
                 {},
@@ -221,7 +259,9 @@ def create_app(state_dir=None, public_url=None):
                     "Access-Control-Allow-Headers": "content-type",
                 },
             )
-        if request.method in ["POST", "PUT", "PATCH", "DELETE"] and not browser_import:
+        if request.method in ["POST", "PUT", "PATCH", "DELETE"] and not (
+            browser_import or device_request
+        ):
             request_origin = request.headers.get("origin")
             if request_origin and request_origin not in {
                 parsed.scheme + "://" + h for h in allowed_hosts
@@ -234,7 +274,7 @@ def create_app(state_dir=None, public_url=None):
                     {"detail": {"message": "跨站请求已拒绝"}}, status_code=403
                 )
         response = await call_next(request)
-        if browser_import:
+        if browser_import or device_request:
             response.headers["Access-Control-Allow-Origin"] = EXTENSION_ORIGIN
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -274,6 +314,8 @@ def create_app(state_dir=None, public_url=None):
         )
 
     def session(request: Request):
+        if request.headers.get("x-studio-device"):
+            return desktop.authenticate(request)
         token = request.cookies.get("studio_session", "")
         rows = store.rows(
             "SELECT * FROM sessions WHERE token_hash=? AND expires>?",
@@ -334,8 +376,7 @@ def create_app(state_dir=None, public_url=None):
             store.event("setup", "已创建工作室管理员", c=c)
         return login_response()
 
-    @app.post("/api/v1/auth/login")
-    def login(body: Login, request: Request):
+    def check_login(body: Login, request: Request):
         ip = digest(request.client.host if request.client else "unknown")
         now = int(time.time())
         with store.db(True) as c:
@@ -352,7 +393,20 @@ def create_app(state_dir=None, public_url=None):
             fail("密码不正确", 401)
         with store.db() as c:
             c.execute("DELETE FROM login_attempts WHERE ip=?", (ip,))
+
+    @app.post("/api/v1/auth/login")
+    def login(body: Login, request: Request):
+        check_login(body, request)
         return login_response()
+
+    @app.post("/api/v1/desktop/login")
+    def desktop_login(body: Login, request: Request):
+        if not local or request.headers.get("origin") != EXTENSION_ORIGIN:
+            fail("请使用本机浏览器连接助手授权。", 403)
+        if not store.get("password_hash"):
+            fail("请先打开本机工作室设置管理员密码。", 409)
+        check_login(body, request)
+        return desktop.issue()
 
     @app.get("/api/v1/auth/session")
     def whoami(auth=Depends(session)):

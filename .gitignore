@@ -32,3 +32,5 @@ autopilot_actions.jsonl
 
 # Hosting links and provider credentials
 .vercel/
+
+.vercel-dist/

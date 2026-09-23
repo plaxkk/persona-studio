@@ -49,3 +49,9 @@
 Chrome Manifest V3 扩展，授权指定 loopback origin 后使用官方 cookies API，仅读取 x.com 的 auth_token / ct0。API 管理员会话与 CSRF 发起五分钟一次性配对；扩展直接传送，页面无 cookie 明文。验证失败、账号错配、取消、过期、注销与配置变化均不能覆盖原凭据。18 项新增后端测试通过，全套累计 64 项。
 
 `PYTHONPATH=. .venv/bin/python tests/browser_extension_e2e.py` 在临时 Chromium 配置和临时数据库中验证扩展真正加载、首次授权、未登录引导、HttpOnly cookie 读取、登录后自动验证/填入用户名、重开面板自动连接、过期登录后自动续接（模拟登录同时更新两个必要 cookie）、停止自动连接、桌面/手机布局。浏览器真实运行，X 登录页及身份接口为模拟夹具；不代表用户日常 Chrome 已安装扩展或真实登录已验收。安装说明见 [连接助手](../browser-extension/README.md)。
+
+## 在线面板连接本机（新增）
+
+全套 Python 测试累计 81 项通过；新增设备会话、来源/路径/方法白名单、过期、撤销、授权替换和密码限流覆盖。Chrome 扩展的带设备令牌 GET 请求可能不携带 Origin，服务端允许这一情况；有 Origin 时必须为固定扩展来源，写入始终严格校验来源，浏览器网页直连仍被跨域边界拒绝。
+
+`tests/desktop_browser_e2e.py` 用真实隔离 Chromium 扩展和临时数据库验证：HTTPS 面板授权、本机保存 Unicode 草稿、模拟本机 Agent 试聊、切换引擎、暂停、拒绝密钥管理/路径穿越、实际停止和重启临时后端后的重连与编辑保留、撤销、桌面/移动布局。检测到的云站点请求全部为 GET 静态资源，无云端 API 请求。生产尚未配置的真实模型仍标为“待配置”。

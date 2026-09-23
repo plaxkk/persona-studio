@@ -19,6 +19,17 @@
     ><input id="origin" value="http://127.0.0.1:18880" type="url" />
     <button id="allow">允许连接并打开工作室</button
     ><button id="revoke" class="secondary">停止自动连接</button>
+    <hr />
+    <h2>连接在线面板</h2>
+    <p>
+      仅授权 https://persona-studio-plaxkk.vercel.app
+      读取本机内容和执行工作室任务。密钥仍在本机；授权有效 24
+      小时，关闭浏览器后需重新授权。
+    </p>
+    <label for="password">本机工作室管理员密码</label
+    ><input id="password" type="password" autocomplete="current-password" />
+    <button id="desktop-allow">授权并打开在线工作室</button>
+    <button id="desktop-revoke" class="secondary">断开在线面板</button>
     <p id="status" role="status"></p>
     <script src="popup.js" type="module"></script>
   </body>

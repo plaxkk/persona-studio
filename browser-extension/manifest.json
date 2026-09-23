@@ -1,17 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "人格工作室 · X 连接助手",
-  "version": "1.0.0",
+  "name": "人格工作室 · 本机连接助手",
+  "version": "1.1.0",
   "description": "仅在授权的本机工作室中连接当前 X 登录账号，不发布任何内容。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApA2PUI7DNLeQ6+kTRmUBNMw/801Etw0rync9IJMfufu2zIWZyrFjdIDhh6n+tZLagJT5Xgm2GHVwJ1PFzmBHe+MzHeBEIsgHdIJhPNeXWAkPRpOBSYlORw1bcKXs715NGRT3jcRxNeizQmwPP/KHHHb8Wm8eK7yH7Uf6i2nOzh47VqWrKKC/Qtbn9PsGa1LVCUXOOkfXqAyxUukKoeiP1UflaU4ULblO+XjaP74XH+qkRV7SkfPJ3ooQm0hs9xXyR+/V+8odnO0Mi35/1ekPlmDYgoKGxQuFKi4BXsyd6oSlpPfizPUE3H6op/172QYRNqN1pjhFHvA2GuLJ4jDnmwIDAQAB",
-  "permissions": ["cookies", "storage", "alarms"],
+  "permissions": [
+    "cookies",
+    "storage",
+    "alarms"
+  ],
   "host_permissions": [
     "https://x.com/*",
     "http://127.0.0.1/*",
     "http://localhost/*"
   ],
   "externally_connectable": {
-    "matches": ["http://127.0.0.1/*", "http://localhost/*"]
+    "matches": [
+      "http://127.0.0.1/*",
+      "http://localhost/*",
+      "https://persona-studio-plaxkk.vercel.app/*"
+    ]
   },
   "background": {
     "service_worker": "background.js",
