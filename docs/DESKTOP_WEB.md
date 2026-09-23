@@ -7,11 +7,11 @@ Vercel 仅托管静态 React 页面和连接助手 ZIP。网页通过 Chrome/Edg
 ## 首次连接
 
 1. 启动本机工作室，确认 http://127.0.0.1:18880 可打开并已设置管理员密码。
-2. 在 Chrome / Edge 安装连接助手 1.1，旧版需更新文件并在扩展管理页点“重新加载”。扩展 ID 保持不变。
-3. 从浏览器工具栏打开连接助手，填写本机地址，在“连接在线面板”输入本机管理员密码，点击授权。
+2. 在 Chrome / Edge 安装连接助手 1.2，旧版需更新文件并在扩展管理页点“重新加载”。扩展 ID 保持不变。
+3. 首次安装执行 `.venv/bin/python deployment/install_browser_connector.py`（自定义状态目录/端口使用 `--state` / `--port`）。从浏览器工具栏打开连接助手，点击“授权并打开在线工作室”，无需密码。
 4. 扩展打开正式网站。网页检测到授权后显示本机工作室。
 
-管理员密码仅从扩展页面直接交给本机服务。设备会话令牌仅保存在扩展 `storage.session`，不返回网页，不写 URL、日志或磁盘配置。授权最长 24 小时，浏览器关闭后需重新授权；新授权使旧设备会话失效。页面“断开”、本机账号退出对应设备会话及扩展“断开在线面板”均可停止访问。
+本机连接程序通过 Chrome Native Messaging 在当前操作系统用户下签发设备会话，仅允许固定扩展 ID 调用，不提供密码免验 HTTP 登录。设备会话令牌仅保存在扩展 `storage.session`，不返回网页，不写 URL、日志或磁盘配置。授权最长 24 小时，浏览器关闭后需重新授权；新授权使旧设备会话失效。页面“断开”、本机账号退出对应设备会话及扩展“断开在线面板”均可停止访问。
 
 配置 X、Telegram、模型密钥请打开本机设置。网页支持人设、语料、试聊、互动收件箱、同步、草稿编辑和生成、切换已验证引擎、活动记录、备份到本机及暂停。Codex / Claude 暂仍为预留入口。
 
@@ -19,7 +19,7 @@ Vercel 仅托管静态 React 页面和连接助手 ZIP。网页通过 Chrome/Edg
 
 - 只允许固定正式 HTTPS origin，不允许整个 vercel.app 域名或任意预览域名。
 - 拒绝无痕、iframe 调用和任意 URL 转发；只允许业务 API 的固定路径和方法。
-- 设备登录需要本机密码，沿用 15 分钟 10 次失败限制。普通本机 cookie 会话继续执行 CSRF 校验。
+- 连接助手不显示密码框；Native Messaging 清单限制固定扩展来源，程序限制操作、端口和当前用户的私有状态目录。普通本机 cookie 会话继续执行 CSRF 校验。旧版密码登录接口暂保留兼容。
 - 本机服务独立核验设备会话、扩展 Origin、有效期和接口白名单。配置密钥、初始化管理员、通用文件读取和命令执行不属于设备接口。
 - 请求不跟随重定向。写操作失败不自动重试，以免重复生成或重复保存。
 - 云端页面使用严格 CSP，不接入分析脚本；页面代码及后续 Git 推送属于信任边界，只有可信代码可以发布。
@@ -39,3 +39,5 @@ Vercel 仅托管静态 React 页面和连接助手 ZIP。网页通过 Chrome/Edg
 `tests/test_desktop.py` 覆盖设备登录、过期、新授权替换、撤销、来源校验、敏感操作拒绝和登录限流。
 
 `PYTHONPATH=. .venv/bin/python tests/desktop_browser_e2e.py` 在临时数据库和隔离真实 Chromium 中验证扩展授权、草稿落到本机、模拟本机 Agent 试聊、引擎切换、暂停、敏感接口拒绝、重连保留编辑、撤销及桌面/移动布局。Agent 输出是明确的模拟夹具；生产模型需配置真实 API key 后验证。
+
+原生通信协议参考：[Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging)。安装器支持 macOS / Linux 当前用户的 Chrome、Chrome for Testing、Chromium 和 Edge，不读取浏览器 cookie 数据库。

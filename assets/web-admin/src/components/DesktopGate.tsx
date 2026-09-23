@@ -18,7 +18,7 @@ export function DesktopGate() {
     setMessage(
       r.message ||
         (r.code === "authorization"
-          ? "请在连接助手中用本机管理员密码授权。"
+          ? "请打开连接助手，点击“授权并打开在线工作室”。"
           : "请确认本机工作室已启动。"),
     );
     setBusy(false);
@@ -90,7 +90,7 @@ export function DesktopGate() {
           <ol>
             <li>
               <a href="/downloads/persona-studio-browser.zip" download>
-                下载本机连接助手 1.1
+                下载本机连接助手 1.2
               </a>
               ，解压后在 <code>chrome://extensions</code>{" "}
               开启开发者模式，加载已解压的扩展程序。已安装旧版时点扩展卡片的“重新加载”。
@@ -100,11 +100,9 @@ export function DesktopGate() {
               <a href="http://127.0.0.1:18880" target="_blank" rel="noreferrer">
                 本机工作室
               </a>
-              正在运行，并已设置管理员密码。
+              正在运行，且已安装本机连接程序。
             </li>
-            <li>
-              打开连接助手，在“连接在线面板”中输入本机管理员密码，点击“授权并打开在线工作室”。密码只发给本机服务。
-            </li>
+            <li>打开连接助手，点击“授权并打开在线工作室”，无需输入密码。</li>
           </ol>
           <p className="muted">
             仅支持这台电脑的 Chrome / Edge；手机、无痕模式及 Codex

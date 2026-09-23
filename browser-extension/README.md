@@ -17,6 +17,6 @@
 
 参考：[Chrome cookies API](https://developer.chrome.com/docs/extensions/reference/api/cookies)、[外部消息](https://developer.chrome.com/docs/extensions/reference/manifest/externally-connectable)。
 
-## 在线面板（1.1）
+## 在线面板（1.2）
 
-打开扩展菜单，在“连接在线面板”中输入本机管理员密码，点击授权。只授权 https://persona-studio-plaxkk.vercel.app 这一来源。密码直达本机，设备令牌保存在浏览器扩展会话内；关闭浏览器或 24 小时后需重新授权。网页能查看人设、草稿、会话并请求本机 Agent 执行工作室任务，密钥配置仍只能在本机设置页操作。扩展菜单“断开在线面板”可撤销连接。旧版需在扩展管理页重新加载。
+先在项目目录运行 `.venv/bin/python deployment/install_browser_connector.py` 安装本机连接程序。打开扩展菜单，点击“授权并打开在线工作室”，无需输入密码。只授权 https://persona-studio-plaxkk.vercel.app 这一来源。授权通过仅接受本扩展的 Native Messaging 本机程序完成，设备令牌保存在浏览器扩展会话内；关闭浏览器或 24 小时后需重新授权。网页能查看人设、草稿、会话并请求本机 Agent 执行工作室任务，密钥配置仍只能在本机设置页操作。扩展菜单“断开在线面板”可撤销连接。旧版需在扩展管理页重新加载。

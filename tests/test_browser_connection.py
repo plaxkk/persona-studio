@@ -189,7 +189,7 @@ def test_archive_and_identity(client):
         for c in hashlib.sha256(base64.b64decode(manifest["key"])).hexdigest()[:32]
     )
     assert actual == EXTENSION_ID
-    assert manifest["permissions"] == ["cookies", "storage", "alarms"]
+    assert manifest["permissions"] == ["cookies", "storage", "alarms", "nativeMessaging"]
     assert "https://x.com/*" in manifest["host_permissions"]
     assert "*://*/*" not in manifest["host_permissions"]
 

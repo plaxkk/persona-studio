@@ -52,20 +52,27 @@ document.querySelector("#desktop-allow").onclick = async () => {
       local.hash
     )
       throw new Error("请输入正确的本机工作室地址。");
-    status.textContent = "正在验证本机管理员…";
-    const response = await fetch(local.origin + "/api/v1/desktop/login", {
-      method: "POST",
-      credentials: "omit",
-      redirect: "error",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        password: document.querySelector("#password").value,
-      }),
-      signal: AbortSignal.timeout(15000),
-    });
-    document.querySelector("#password").value = "";
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.detail?.message || "本机授权失败。");
+    status.textContent = "正在连接这台电脑…";
+    let data;
+    try {
+      data = await chrome.runtime.sendNativeMessage(
+        "ai.personastudio.connector",
+        {
+          type: "authorize",
+          local: local.origin,
+        },
+      );
+    } catch {
+      throw new Error(
+        "本机连接程序未安装或扩展未更新。请安装连接程序并重新加载扩展，再点击授权。",
+      );
+    }
+    if (
+      !data?.ok ||
+      typeof data.token !== "string" ||
+      !Number.isFinite(data.expires)
+    )
+      throw new Error(data?.message || "本机授权失败。");
     if (data.origin !== CLOUD_ORIGIN)
       throw new Error("本机服务版本不匹配，请更新。");
     await chrome.storage.session.set({
@@ -79,7 +86,6 @@ document.querySelector("#desktop-allow").onclick = async () => {
         ? "本机服务未启动或版本过旧，请先打开本机工作室。"
         : error.message;
   } finally {
-    document.querySelector("#password").value = "";
     button.disabled = false;
   }
 };
