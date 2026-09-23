@@ -114,6 +114,7 @@ class PersonaImports:
             )
 
     def create(self, account, target, model, reasoning):
+        account = account.lstrip("@").lower()
         if not re.fullmatch(r"[A-Za-z0-9_]{1,15}", account):
             error("请先连接并核对你的 X 账号。", 422)
         if target not in (20, 100, 300):

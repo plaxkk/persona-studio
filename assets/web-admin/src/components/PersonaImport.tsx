@@ -59,8 +59,10 @@ const labels = ["角色名字", "身份定位", "说话方式", "兴趣话题", 
 export default function PersonaImport({
   actions,
   onApply,
+  expectedAccount,
 }: {
   actions: Actions;
+  expectedAccount: string;
   onApply: (p: Persona) => void;
 }) {
   const [check, setCheck] = useState<Preflight | null>(null),
@@ -90,7 +92,9 @@ export default function PersonaImport({
       .then((v) => {
         if (alive) setCheck(v);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => {
+        if (alive) setError(e instanceof Error ? e.message : String(e));
+      });
     return () => {
       alive = false;
       clearInterval(timer);
@@ -147,7 +151,7 @@ export default function PersonaImport({
       <h2>从我的 X 生成人设</h2>
       <p>
         让本机 Codex 在专用 Chrome 标签页阅读 @
-        {check?.account || job?.account || "待连接账号"}{" "}
+        {check?.account || job?.account || expectedAccount || "待连接账号"}{" "}
         的资料、推文和回复。采集期间不会修改当前人设。
       </p>
       <p className="muted">
@@ -156,7 +160,8 @@ export default function PersonaImport({
         条回复，可互补，不代表全部历史。不读取私信，不执行发帖或互动。
       </p>
       <p>
-        {check?.message || "正在检查连接助手和 Codex…"}{" "}
+        {check?.message ||
+          (error ? "等待连接助手更新或授权" : "正在检查连接助手和 Codex…")}{" "}
         {check?.model && `模型：${check.model}`}
       </p>
       {!check?.browser_connected && (

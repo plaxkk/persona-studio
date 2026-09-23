@@ -65,6 +65,7 @@ def candidate(imports, ident):
 def test_dedupe_pause_late_results(imports):
     ident = job(imports)
     assert imports.create("example", 20, "test-model", "medium") == ident
+    assert imports.create("EXAMPLE", 20, "test-model", "medium") == ident
     action, _ = evidence(imports, ident)
     assert imports.get(ident)["counts"] == {
         "read": 20,

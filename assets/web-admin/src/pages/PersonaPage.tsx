@@ -28,7 +28,11 @@ export default function PersonaPage({
         description="决定它关心什么、如何表达，再用聊天慢慢找到它的声音。"
         action={<Badge>虚构 AI 人格 · v{form.version}</Badge>}
       />
-      <PersonaImport actions={actions} onApply={setForm} />
+      <PersonaImport
+        actions={actions}
+        onApply={setForm}
+        expectedAccount={data.connections.x.username}
+      />
       <div className="persona-grid">
         <section className="surface">
           <h2>人格设定</h2>
