@@ -62,6 +62,7 @@ async def main():
                     "browse",
                     {"action": "snapshot"},
                 )
+                dispatch(importer.imports, job["id"], job["generation"], "finish", {})
                 return {"finished": True}
             ids = [r["id"] for r in importer.imports.sources(job["id"])]
             return {

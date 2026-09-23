@@ -73,6 +73,13 @@ def main():
             "inputSchema": empty,
         },
     ]
+    for tool in tools:
+        tool["annotations"] = {
+            "readOnlyHint": tool["name"] == "progress",
+            "destructiveHint": False,
+            "idempotentHint": tool["name"] in ("progress", "finish"),
+            "openWorldHint": tool["name"] == "browse",
+        }
     for line in sys.stdin:
         try:
             request = json.loads(line)

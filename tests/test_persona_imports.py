@@ -291,3 +291,20 @@ def test_rebalances_after_first_source_fills_target(imports):
     evidence(imports, ident, records=replies)
     counts = imports.get(ident)["counts"]
     assert counts["usable"] == 20 and counts["post"] == counts["reply"] == 10
+
+
+def test_model_cannot_claim_browser_completion_without_mcp(imports, monkeypatch):
+    ident = job(imports)
+    evidence(imports, ident)
+    with imports.store.db() as c:
+        c.execute("UPDATE persona_imports SET status='queued' WHERE id=?", (ident,))
+    monkeypatch.setattr("studio.codex_persona.preflight", lambda: {"ready": True})
+    runner = CodexPersonaRunner(imports.store)
+
+    async def pretend(*args):
+        return {"finished": True}
+
+    runner.execute = pretend
+    asyncio.run(runner.tick())
+    assert imports.get(ident)["status"] == "failed"
+    assert not imports.get(ident)["candidate"]
