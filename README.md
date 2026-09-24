@@ -56,6 +56,7 @@ npm --prefix assets/web-admin run build
 
 - [架构审查与验收项](docs/ARCHITECTURE_REVIEW.md)
 - [部署、迁移、备份与恢复](docs/DEPLOYMENT.md)
+- [从 Git 与 Codex 工作记录获取原创灵感](docs/work-inspiration.md)
 - [验收结果与尚待真实连接验证的范围](docs/ACCEPTANCE.md)
 
 ## 来源与许可证

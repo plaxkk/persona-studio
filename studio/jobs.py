@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 from .engines import Engines, EngineRequest, EngineError
 from .security import Secrets, sanitize
 from .xreader import XReader, ReadError
+from .inspiration import collect_work
 
 
 class JobError(Exception):
@@ -351,6 +352,10 @@ class Jobs:
             )
         ]
         context["recent_output"] = recent
+        if kind == "post":
+            work = await asyncio.to_thread(collect_work, self.store.root)
+            if work:
+                context["work_inspiration"] = work
         if kind == "chat":
             summaries = self.store.rows(
                 "SELECT text FROM conversation_summaries WHERE channel=?", (channel,)
