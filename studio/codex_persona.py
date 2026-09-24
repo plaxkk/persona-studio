@@ -228,7 +228,10 @@ def command(folder, job, schema, output, state=None):
                 ],
                 "enabled_tools": ["browse", "progress", "finish"],
                 "tools": {
-                    name: {"approval_mode": "auto"}
+                    # `auto` still prompts for the browser tool's open-world
+                    # annotation. Approve only this task-bound allowlist; never
+                    # change global approvals, sandboxing, or other tools.
+                    name: {"approval_mode": "approve"}
                     for name in ("browse", "progress", "finish")
                 },
                 "tool_timeout_sec": 55,
