@@ -2,7 +2,7 @@ import { readPersonaPage } from "./persona-page.js";
 let socket,
   connecting = false;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
-async function operate(action) {
+export async function operate(action) {
   const key = "persona-task-" + action.import_id;
   let saved = (await chrome.storage.session.get(key))[key];
   let tab;
@@ -46,18 +46,38 @@ async function operate(action) {
     });
     return result[0]?.result || { state: "waiting_browser" };
   };
+  // Poll read-only readiness, never repeat a click/scroll while waiting.
+  const readWhenReady = async (a) => {
+    let result = { state: "waiting_browser" };
+    for (let attempt = 0; attempt < 30; attempt++) {
+      try {
+        const current = await chrome.tabs.get(tab.id);
+        result =
+          current.status === "complete"
+            ? await run(a)
+            : { state: "waiting_browser" };
+      } catch {
+        result = { state: "waiting_browser" };
+      }
+      if (result.state !== "waiting_browser") return result;
+      await delay(500);
+    }
+    return result;
+  };
   // Re-check signed-in identity before any navigation/action, including resume.
-  let result = await run({ kind: "identity" });
+  let result = await readWhenReady({ kind: "identity" });
   if (result.state === "ready") {
     if (["profile", "posts", "replies"].includes(action.kind)) {
-      await chrome.tabs.update(tab.id, {
-        url:
-          "https://x.com/" +
-          action.account +
-          (action.kind === "replies" ? "/with_replies" : ""),
-      });
-      await delay(2200);
-      result = await run({ kind: "snapshot" });
+      const url =
+        "https://x.com/" +
+        action.account +
+        (action.kind === "replies" ? "/with_replies" : "");
+      const current = await chrome.tabs.get(tab.id);
+      if (current.url !== url) {
+        await chrome.tabs.update(tab.id, { url });
+        await delay(500);
+      }
+      result = await readWhenReady({ kind: "snapshot" });
     } else {
       result = await run(action);
       if (result.navigate) {
@@ -68,8 +88,8 @@ async function operate(action) {
         )
           return { state: "waiting_browser" };
         await chrome.tabs.update(tab.id, { url: url.href });
-        await delay(2200);
-        result = await run({ kind: "snapshot" });
+        await delay(500);
+        result = await readWhenReady({ kind: "snapshot" });
       }
     }
   }

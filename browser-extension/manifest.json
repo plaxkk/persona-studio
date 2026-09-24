@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "人格工作室 · 本机连接助手",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "仅在授权的本机工作室中连接当前 X 登录账号，不发布任何内容。",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApA2PUI7DNLeQ6+kTRmUBNMw/801Etw0rync9IJMfufu2zIWZyrFjdIDhh6n+tZLagJT5Xgm2GHVwJ1PFzmBHe+MzHeBEIsgHdIJhPNeXWAkPRpOBSYlORw1bcKXs715NGRT3jcRxNeizQmwPP/KHHHb8Wm8eK7yH7Uf6i2nOzh47VqWrKKC/Qtbn9PsGa1LVCUXOOkfXqAyxUukKoeiP1UflaU4ULblO+XjaP74XH+qkRV7SkfPJ3ooQm0hs9xXyR+/V+8odnO0Mi35/1ekPlmDYgoKGxQuFKi4BXsyd6oSlpPfizPUE3H6op/172QYRNqN1pjhFHvA2GuLJ4jDnmwIDAQAB",
   "permissions": [
