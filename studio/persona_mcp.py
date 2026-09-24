@@ -19,6 +19,23 @@ def dispatch(imports, ident, generation, name, args):
             k: job[k] for k in ("account", "counts", "target", "actions", "profile")
         }
     if name == "finish":
+        # A model's claim is not evidence that it visited the account. Only
+        # extension-acknowledged reads can authorize the analysis transition.
+        completed = imports.store.rows(
+            "SELECT kind FROM persona_browser_actions WHERE import_id=? AND status='done' AND json_extract(result,'$.state')='ready'",
+            (ident,),
+        )
+        if not completed:
+            return {
+                "finished": False,
+                "message": "No verified browser read yet. Call browse with action snapshot first; then browse posts and replies. Do not return finished=true.",
+            }
+        visited = {r["kind"] for r in completed}
+        if job["counts"]["usable"] < job["target"] and not {"posts", "replies"}.issubset(visited):
+            return {
+                "finished": False,
+                "message": "Target not reached. Read BOTH sources with browse actions posts and replies before claiming exhaustion. Continue scrolling while new records appear.",
+            }
         with imports.store.db() as c:
             c.execute(
                 "UPDATE persona_imports SET phase='analyze' WHERE id=? AND generation=? AND status='collecting'",
@@ -69,7 +86,7 @@ def main():
         },
         {
             "name": "finish",
-            "description": "End collection with current evidence. Never fabricate missing records.",
+            "description": "Finish only AFTER verified browser reads reached the target or both posts and replies were explored to exhaustion. This does not browse or collect. Check finished=false and continue browsing if refused.",
             "inputSchema": empty,
         },
     ]
