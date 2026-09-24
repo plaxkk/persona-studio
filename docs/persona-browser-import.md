@@ -38,4 +38,6 @@ macOS 使用附加的只收紧权限沙箱，禁止读取个人 AGENTS、技能�
 
 真实 X 采集尚未运行：需要用户在 Chrome 扩展管理页重新加载 1.3 并授权后，再进行 20/300 条验收。浏览器自动化安全策略禁止代理打开 chrome://extensions，不能绕过。现有人设保持不变。
 
-可选真实模型协议检查：`.venv/bin/python tests/persona_codex_live_smoke.py`，会消耗所选模型额度，但不读取 X 或真实人设。MCP 仅对 `browse/progress/finish` 三个固定工具使用 `approval_mode=auto`，其它工具仍关闭；不以模型声称“完成”代替实际 MCP 完成检查点。
+可选真实模型协议检查：`.venv/bin/python -m tests.persona_codex_browse_regression_1`，会消耗所选模型额度，但不读取 X 或真实人设。MCP 仅对 `browse/progress/finish` 三个固定工具使用 `approval_mode=approve`，其它工具仍关闭；不以模型声称“完成”代替实际 MCP 完成检查点。
+
+2026-09-24 QA 修正：`auto` 仍会对浏览工具要求审批，不能用于此无人值守任务。新协议测试必须实际调用 browse 并持久化 20 条模拟证据，进度查询成功不足以证明浏览可用。旧的 progress/finish-only smoke 不再是验收入口。结束采集要求扩展确认的页面证据；不足目标时还必须读取推文与回复两个来源。
