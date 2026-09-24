@@ -91,7 +91,7 @@ def test_post_pipeline_passes_work_to_engine(tmp_path):
     store.set('paused', False)
     with store.db(True) as c:
         c.execute("UPDATE engines SET status='ready'")
-    (tmp_path / 'work-inspiration.json').write_text('{"enabled":true}')
+    (tmp_path / 'work-inspiration.json').write_text('{"enabled":true,"allowed_engines":["hermes"]}')
     jobs = Jobs(store)
     requests = []
 

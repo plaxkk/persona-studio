@@ -2,7 +2,7 @@
 
 面向个人用户的自托管 X 内容工作台：**自动读取互动 → 人格判断和写作 → 你修改 → 复制并去 X → 你完成操作。**
 
-一个独立虚构人格、一个 X 账号。中文优先，支持 OpenClaw / Hermes 写作引擎，Telegram 私人遥控器可选。Codex 和 Claude Code 仅预留适配位置。
+一个独立虚构人格、一个 X 账号。中文优先，支持 Codex / OpenClaw / Hermes 写作引擎，Telegram 私人遥控器可选。Claude Code 仅预留适配位置。
 
 本版没有 X 发布接口，不自动发帖、回复、点赞、转帖或关注，不包含远程浏览器控制。点击跳转只记录“已打开 X”；“我已完成”是用户确认，不是平台验证。原创与回复均采用复制后打开页面，文案不会自动进入 URL。
 
@@ -11,7 +11,7 @@
 打开本机 [人格工作室](http://127.0.0.1:18880)，首次设置管理员密码。
 
 1. 在“我的人格”填写名字、虚构身份、语气、兴趣和禁区；可导入 TXT / Markdown / JSON / JSONL / CSV，内部调用 `scripts/persona_distill.py` 净化与蒸馏。导入文件上限 1 MB。
-2. 在“设置 → 写作引擎”配置 Hermes 或 OpenClaw 的模型名称、OpenAI 兼容接口地址与 API Key，然后测试连接。只有实际调用成功的引擎才可选择。
+2. 在“设置 → 写作引擎”选择链路：Codex 复用本机 ChatGPT 登录，点击“测试连接”同步本机模型并验证后即可切换，无需 DeepSeek API Key；Hermes / OpenClaw 使用各自保存的模型、兼容接口与 API Key。只有实际调用成功的引擎才可选择。切换仅影响新任务，已排队任务保留原链路；失败不会自动转发到其他供应商。
 3. 在 Chrome / Edge 安装并授权 [浏览器连接助手](browser-extension/README.md)，之后打开工作室会自动连接当前 X 账号；未登录时引导登录，登录完成自动验证并填入用户名。也可在“设置 → 账号连接”手动提供 `auth_token` / `ct0` 或 Cookie-Editor JSON。产品不读取浏览器 cookie 数据库。
 4. 首次启动保持暂停，连接检查后从首页开始运行。未连接 Telegram 也可完成全部 Web 流程。
 5. 在收件箱处理互动或写原创，编辑后的草稿自动保存。去 X 前核对浏览器当前登录账号，复制失败可手动复制，弹窗被拦可使用普通链接。
@@ -40,7 +40,7 @@ macOS 安装两个 launchd 服务；Linux 使用 `--systemd-user`。引擎需单
 
 ## 架构与验证
 
-FastAPI + React / TypeScript + SQLite 的模块化单体。API `/api/v1`，管理员 HttpOnly 会话与 CSRF 保护；SQLite 持久任务队列、任务取消、去重、有限重试、草稿版本与人工编辑保护。人设、记忆、反馈、会话摘录与审计持久化。引擎子进程独立 HOME、禁用工具，只接收对应模型密钥。
+FastAPI + React / TypeScript + SQLite 的模块化单体。API `/api/v1`，管理员 HttpOnly 会话与 CSRF 保护；SQLite 持久任务队列、任务取消、去重、有限重试、草稿版本与人工编辑保护。人设、记忆、反馈、会话摘录与审计持久化。Hermes / OpenClaw 子进程使用独立 HOME 和对应模型密钥；Codex 复用本机登录，在临时目录运行并隔离个人指令与操作工具。
 
 默认每 30 分钟同步，手动刷新至少相隔 60 秒；每来源一页、最多 20 条，单来源 15 秒，整轮最多 55 秒。每天自动生成至多 12 条互动草稿、2 条原创草稿，每轮至多 3 条互动草稿。手动生成单独计数；这是生成预算，不是发送配额。
 
@@ -57,6 +57,7 @@ npm --prefix assets/web-admin run build
 - [架构审查与验收项](docs/ARCHITECTURE_REVIEW.md)
 - [部署、迁移、备份与恢复](docs/DEPLOYMENT.md)
 - [从 Git 与 Codex 工作记录获取原创灵感](docs/work-inspiration.md)
+- [Codex 写作与链路切换](docs/codex-writing.md)
 - [验收结果与尚待真实连接验证的范围](docs/ACCEPTANCE.md)
 
 ## 来源与许可证

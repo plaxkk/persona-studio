@@ -46,6 +46,8 @@ ERRORS = {
     "rate_limited": "X 暂时限制了读取频率，稍后会再试。",
     "timeout": "连接超时，请稍后重试。",
     "engine_failed": "引擎调用失败，请检查模型和连接配置。",
+    "codex_not_ready": "Codex 尚未就绪，请检查本机 ChatGPT 登录和模型设置，然后重新测试连接。",
+    "codex_failed": "Codex 调用失败，请检查登录、模型额度或网络；未切换到其他服务。",
     "invalid_output": "引擎没有返回有效结果。",
     "internal_error": "任务未能完成，请查看诊断或重试。",
     "cancelled": "任务已取消。",
@@ -640,6 +642,8 @@ def create_app(state_dir=None, public_url=None):
     def engine_config(engine: str, body: EngineConfig):
         if engine not in engines.adapters:
             fail("unsupported_engine", 404)
+        if engine == "codex":
+            fail("Codex 使用本机 ChatGPT 登录与模型设置，请点击测试连接同步配置，无需 API Key。", 422)
         url = urlparse(body.base_url)
         if url.username or url.password or url.query or url.fragment:
             fail("模型地址不能包含凭据、查询参数或片段。", 422)
@@ -667,6 +671,15 @@ def create_app(state_dir=None, public_url=None):
     def engine_verify(engine: str):
         if engine not in engines.adapters:
             fail("unsupported_engine", 404)
+        if engine == "codex":
+            config = engines.adapters[engine].local_config()
+            with store.db(True) as c:
+                pending = c.execute("SELECT id FROM tasks WHERE dedupe=? AND status IN ('queued','running')",
+                                    ("probe:" + engine,)).fetchone()
+                if pending:
+                    return {"task_id": pending["id"]}
+                c.execute("UPDATE engines SET config=?,status='not_verified',checked=0 WHERE id=?",
+                          (json.dumps(config), engine))
         engines.adapters[engine].validate(engines.config(engine))
         ident = jobs.enqueue("probe", {"engine": engine}, dedupe="probe:" + engine)
         return {"task_id": ident}
@@ -676,6 +689,8 @@ def create_app(state_dir=None, public_url=None):
         rows = store.rows("SELECT * FROM engines WHERE id=?", (engine,))
         if not rows or rows[0]["status"] != "ready":
             fail("engine_not_ready", 409)
+        if engine == "codex":
+            engines.adapters[engine].validate(json.loads(rows[0]["config"]))
         store.set("engine", engine)
         store.event("engine", "已切换写作引擎", {"engine": engine})
         return {"engine": engine}
@@ -684,6 +699,8 @@ def create_app(state_dir=None, public_url=None):
     def engine_delete(engine: str):
         if engine not in engines.adapters:
             fail("unsupported_engine", 404)
+        if engine == "codex":
+            fail("Codex 使用本机 ChatGPT 登录；此操作不会删除或退出你的 Codex 登录。", 422)
         vault.delete(engine)
         with store.db() as c:
             config = engines.config(engine)

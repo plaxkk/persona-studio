@@ -353,7 +353,7 @@ class Jobs:
         ]
         context["recent_output"] = recent
         if kind == "post":
-            work = await asyncio.to_thread(collect_work, self.store.root)
+            work = await asyncio.to_thread(collect_work, self.store.root, payload["engine"])
             if work:
                 context["work_inspiration"] = work
         if kind == "chat":

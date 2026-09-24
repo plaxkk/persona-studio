@@ -128,7 +128,7 @@ export default function PersonaPage({
               <Badge>
                 {data.overview.settings.engine === "hermes"
                   ? "Hermes"
-                  : "OpenClaw"}
+                  : data.overview.settings.engine === "codex" ? "Codex" : "OpenClaw"}
               </Badge>
             </div>
             <p className="muted">

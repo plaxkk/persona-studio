@@ -1,4 +1,5 @@
 import { desktopMode, desktopCall } from "./desktop";
+import { EXTENSION_VERSION, isUpgradeRelatedRoute } from "./extension-info";
 let csrf = "";
 export function setCsrf(value: string) {
   csrf = value;
@@ -23,10 +24,12 @@ export async function api<T = Record<string, unknown>>(
           ),
         );
       if (path === "/auth/logout" && reply.ok) return reply.data as T;
-      if (reply.code === "forbidden" && path.startsWith("/persona-imports"))
+      if (reply.code === "forbidden" && isUpgradeRelatedRoute(path)) {
+        window.dispatchEvent(new Event("desktop-upgrade-required"));
         throw new Error(
-          "连接助手版本较旧，请更新到 1.3 并重新加载扩展，再授权连接。",
+          `连接助手需要更新至 ${EXTENSION_VERSION}。请使用页面顶部“下载连接助手”，替换旧扩展文件并重新加载，再授权连接。`,
         );
+      }
       throw new Error(reply.message || "本机连接已断开，请重新授权。");
     }
     if ((reply.status || 500) >= 400)
@@ -74,6 +77,8 @@ export const statusLabel: Record<string, string> = {
   connection_error: "连接异常",
   webhook_conflict: "已有其他 Telegram 接收服务",
   engine_failed: "连接失败",
+  codex_not_ready: "Codex 登录或模型未就绪，请重新测试连接",
+  codex_failed: "Codex 调用失败，请检查登录、额度或网络；未切换服务",
   planned: "后续接入",
   queued: "排队中",
   running: "处理中",

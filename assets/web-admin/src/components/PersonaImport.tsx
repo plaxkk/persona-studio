@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { desktopMode } from "../desktop";
+import { EXTENSION_VERSION } from "../extension-info";
 import { Button, Field } from "./UI";
 import type { Actions, Persona } from "../types";
 type ImportJob = {
@@ -173,7 +174,7 @@ export default function PersonaImport({
                 : "/api/v1/browser/extension.zip"
             }
           >
-            下载连接助手 1.3
+            下载连接助手 {EXTENSION_VERSION}
           </a>{" "}
           · 解压后在 Chrome 扩展管理页加载或重新加载，再在扩展中授权连接。
         </p>

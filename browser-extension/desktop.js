@@ -24,7 +24,7 @@ export function allowedRoute(path, method) {
       pathname,
     );
   if (method === "POST")
-    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw)\/(verify|select)|sync|interactions\/[0-9]+\/ignore|generate|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
+    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|interactions\/[0-9]+\/ignore|generate|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
       pathname,
     );
   return (
@@ -93,7 +93,11 @@ export async function desktopMessage(message, sender) {
     if (response.status === 401 || path === "/auth/logout")
       await chrome.storage.session.remove("device");
     if (status)
-      return { ok: response.ok, code: response.ok ? "ready" : "authorization" };
+      return {
+        ok: response.ok,
+        code: response.ok ? "ready" : "authorization",
+        extensionVersion: chrome.runtime.getManifest().version,
+      };
     return { ok: true, status: response.status, data };
   } catch {
     return {

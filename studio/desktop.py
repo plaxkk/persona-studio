@@ -36,7 +36,7 @@ def desktop_route(path, method):
     if method == "POST":
         return bool(
             re.fullmatch(
-                r"/api/v1/(auth/logout|pause|persona/(feedback|corpus)|engines/(hermes|openclaw)/(verify|select)|sync|interactions/[0-9]+/ignore|generate|tasks/[a-f0-9-]+/cancel|drafts(/[a-f0-9-]+/(opened|confirm|archive))?|backup)",
+                r"/api/v1/(auth/logout|pause|persona/(feedback|corpus)|engines/(hermes|openclaw|codex)/(verify|select)|sync|interactions/[0-9]+/ignore|generate|tasks/[a-f0-9-]+/cancel|drafts(/[a-f0-9-]+/(opened|confirm|archive))?|backup)",
                 path,
             )
         )

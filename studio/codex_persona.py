@@ -179,7 +179,7 @@ def preflight():
     return result
 
 
-def command(folder, job, schema, output, state=None):
+def command(folder, job, schema, output, state=None, base_instructions=None):
     args = [
         executable() or "codex",
         "exec",
@@ -205,7 +205,10 @@ def command(folder, job, schema, output, state=None):
     for name in DISABLED:
         args += ["--disable", name]
     catalog = folder / "model-catalog.json"
-    catalog.write_text(json.dumps(model_metadata(job["model"])))
+    metadata = model_metadata(job["model"])
+    if base_instructions is not None:
+        metadata["models"][0]["base_instructions"] = base_instructions
+    catalog.write_text(json.dumps(metadata))
     config = {
         "model_catalog_json": str(catalog),
         "web_search": "disabled",

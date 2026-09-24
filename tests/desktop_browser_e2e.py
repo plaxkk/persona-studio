@@ -29,6 +29,11 @@ class FixtureEngine:
 async def main():
     with tempfile.TemporaryDirectory(prefix="desktop-e2e-") as folder:
         app = create_app(Path(folder) / "state", "http://127.0.0.1:18482")
+        # Codex's real login is covered separately; this fixture uses no live models.
+        app.state.engines.adapters["codex"].detect = lambda: {
+            "installed": False, "supported": True, "login_ready": False,
+            "local_model": "", "message": "模拟环境未登录 Codex",
+        }
         with app.state.store.db() as c:
             c.execute("UPDATE engines SET status='ready'")
         for engine in ["hermes", "openclaw"]:
@@ -131,8 +136,12 @@ async def main():
                 web = await opened.value
                 await web.goto(CLOUD_ORIGIN)
                 await expect(
-                    web.get_by_text("已连接这台电脑 · Agent 与数据在本机运行")
+                    web.get_by_text("已连接这台电脑", exact=True)
                 ).to_be_visible(timeout=15000)
+                await expect(web.get_by_role("link", name="下载连接助手 v1.3.3")).to_be_visible()
+                await web.get_by_role("button", name="安装 / 更新指南", exact=True).click()
+                await expect(web.get_by_role("region", name="连接助手安装与更新")).to_be_visible()
+                await web.get_by_role("button", name="关闭更新指南").click()
                 await web.get_by_role("button", name="写推文", exact=True).click()
                 text = "这是模拟桌面草稿\n中文 🌱 & 特殊字符"
                 await web.get_by_label("给角色一个方向").fill(text)

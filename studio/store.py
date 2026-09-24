@@ -100,7 +100,7 @@ class Store:
                 "INSERT OR IGNORE INTO persona_versions VALUES(1,?,?)",
                 (json.dumps(PERSONA, ensure_ascii=False), int(time.time())),
             )
-            for engine in ["hermes", "openclaw"]:
+            for engine in ["hermes", "openclaw", "codex"]:
                 c.execute(
                     "INSERT OR IGNORE INTO engines(id,config) VALUES(?,?)",
                     (engine, json.dumps({"model": "", "base_url": ""})),

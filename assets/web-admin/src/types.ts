@@ -5,7 +5,10 @@ export type Engine = {
   status: string;
   checked: number;
   key_present: boolean;
-  config: { model?: string; base_url?: string };
+  login_ready?: boolean;
+  local_model?: string;
+  message?: string;
+  config: { model?: string; base_url?: string; reasoning?: string };
 };
 export type Persona = {
   name: string;

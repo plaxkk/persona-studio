@@ -42,6 +42,33 @@ function EngineCard({
         <Badge>后续接入</Badge>
       </div>
     );
+  if (engine.id === "codex")
+    return (
+      <article className={`engine-card ${active ? "selected" : ""}`}>
+        <div className="section-title">
+          <h3>Codex</h3>
+          <Badge tone={active && engine.status === "ready" && engine.login_ready ? "green" : ""}>
+            {active ? (engine.status === "ready" && engine.login_ready ? "正在使用" : "已选择 · 尚未就绪") : label(engine.status)}
+          </Badge>
+        </div>
+        <p className="description">使用本机 Codex 的 ChatGPT 登录，无需 DeepSeek 余额或 API Key。原创、回复和试聊都走这条链路。</p>
+        <p className="muted">{engine.message}</p>
+        <p>本机模型：{engine.local_model || "尚未检测"}</p>
+        {engine.config.model && <p className="muted">写作配置：{engine.config.model} · {engine.config.reasoning}</p>}
+        <p className="muted">测试连接会同步本机模型设置。调用失败时保留任务错误，不会自动换用其他服务。</p>
+        <div className="actions spaced-small">
+          <Button disabled={!engine.installed || !engine.login_ready}
+            onClick={() => void actions.run(() => api("/engines/codex/verify", "POST", {}), "已开始 Codex 真实连接测试")}>
+            <Plug size={15} />测试连接
+          </Button>
+          {!active && <Button disabled={engine.status !== "ready" || !engine.login_ready}
+            onClick={() => void actions.run(() => api("/engines/codex/select", "POST", {}), "后续任务将使用 Codex")}>
+            切换到 Codex
+          </Button>}
+        </div>
+        {engine.checked > 0 && <small className="muted">最近测试：{time(engine.checked)}</small>}
+      </article>
+    );
   return (
     <article className={`engine-card ${active ? "selected" : ""}`}>
       <div className="section-title">
@@ -479,7 +506,7 @@ export default function SettingsPage({
         <>
           <div className="notice">
             <Plug size={17} />
-            引擎只负责理解与写作。切换后保留人设、记忆和草稿，正在进行的任务继续使用原引擎。
+            引擎只负责理解与写作。切换后保留人设、记忆和草稿，已排队及正在进行的任务继续使用原引擎；需要改走新链路时，请取消旧任务后重新生成。
           </div>
           <div className="settings-grid">
             {data.overview.engines

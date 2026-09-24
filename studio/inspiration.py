@@ -73,13 +73,15 @@ def _discussion_tail(path, db):
         return []
 
 
-def collect_work(root):
+def collect_work(root, engine=None):
     """Local config is the explicit allowlist; absent config means no reads."""
     try:
         cfg = json.loads(_read(Path(root) / "work-inspiration.json"))
     except (OSError, ValueError):
         return {}
     if not isinstance(cfg, dict) or cfg.get("enabled") is not True:
+        return {}
+    if engine is not None and engine not in cfg.get("allowed_engines", ["codex"]):
         return {}
     if not isinstance(cfg.get("repositories", []), list):
         return {}

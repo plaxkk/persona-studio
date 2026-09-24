@@ -2,6 +2,7 @@ import { EXTENSION_ID } from "./browser-id";
 export const desktopMode = import.meta.env.VITE_STUDIO_DESKTOP === "true";
 type Reply = {
   ok?: boolean;
+  extensionVersion?: string;
   code?: string;
   message?: string;
   status?: number;

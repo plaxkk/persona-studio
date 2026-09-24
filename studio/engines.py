@@ -7,6 +7,7 @@ import signal
 import sys
 import time
 import uuid
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -366,10 +367,81 @@ class OpenClawEngine(ProcessEngine):
             raise EngineError("invalid_output")
 
 
+class CodexEngine(ProcessEngine):
+    """ChatGPT-authenticated, isolated text generation using the local Codex CLI."""
+    id = "codex"
+
+    def local_config(self):
+        from .codex_persona import preflight
+        info = preflight()
+        if not info["ready"]:
+            raise EngineError("codex_not_ready")
+        return {"model": info["model"], "reasoning": info["reasoning"],
+                "auth": "chatgpt", "revision": uuid.uuid4().hex}
+
+    def detect(self):
+        from .codex_persona import preflight
+        if time.monotonic() - getattr(self, "_checked", -100) > 30:
+            self._info = preflight()
+            self._checked = time.monotonic()
+        info = self._info
+        return {"installed": info["installed"], "supported": True,
+                "login_ready": info["ready"], "local_model": info["model"],
+                "message": info["message"], "auth": "chatgpt"}
+
+    def validate(self, config):
+        self.local_config()
+        if not config.get("model") or config.get("auth") != "chatgpt":
+            raise EngineError("codex_not_ready")
+
+    async def execute(self, request, config, task_id):
+        from .codex_persona import command, environment
+        await asyncio.to_thread(self.validate, config)
+        with tempfile.TemporaryDirectory(prefix="studio-codex-writing-") as tmp:
+            folder = Path(tmp)
+            schema, output = folder / "schema.json", folder / "output.json"
+            schema.write_text(json.dumps({
+                "type": "object", "properties": {"text": {"type": "string"}},
+                "required": ["text"], "additionalProperties": False,
+            }))
+            args = command(folder, config, schema, output,
+                           base_instructions=SAFETY + "\n你是写作助手，仅根据提供的资料生成文本。不要使用工具。返回符合 schema 的 JSON，将正文放入 text 字段。")
+            try:
+                raw = await self.process(
+                    args, environment(),
+                    sanitize(prompt_for(request), self.secrets.all().values()),
+                    task_id, folder,
+                )
+            except EngineError as exc:
+                if exc.code == "engine_failed":
+                    raise EngineError("codex_failed") from exc
+                raise
+            try:
+                # Only accept completed runs without executable tool calls.
+                events = [json.loads(line) for line in raw.splitlines() if line.strip()]
+                if not any(e.get("type") == "turn.completed" for e in events):
+                    raise ValueError()
+                for event in events:
+                    item = event.get("item", {})
+                    if item.get("type") in {"command_execution", "mcp_tool_call", "web_search", "file_change"}:
+                        raise ValueError()
+                if output.stat().st_size > 100000:
+                    raise ValueError()
+                data = json.loads(output.read_text())
+                if not isinstance(data.get("text"), str) or not data["text"].strip():
+                    raise ValueError()
+                usage = next((e.get("usage", {}) for e in reversed(events)
+                              if e.get("type") == "turn.completed"), {})
+                return EngineResult(sanitize(data["text"], self.secrets.all().values()),
+                                    self.id, {k: v for k, v in usage.items() if isinstance(v, (int, float))})
+            except (OSError, ValueError, TypeError, AttributeError):
+                raise EngineError("invalid_output")
+
+
 class Engines:
     def __init__(self, store):
         self.store = store
-        self.adapters = {e.id: e(store) for e in [HermesEngine, OpenClawEngine]}
+        self.adapters = {e.id: e(store) for e in [HermesEngine, OpenClawEngine, CodexEngine]}
 
     def config(self, engine):
         rows = self.store.rows("SELECT config FROM engines WHERE id=?", (engine,))
@@ -396,5 +468,5 @@ class Engines:
                 "key_present": False,
                 "checked": 0,
             }
-            for key in ["codex", "claude"]
+            for key in ["claude"]
         ]
