@@ -1500,3 +1500,26 @@ summary {
   .extension-version { display: none; }
   .extension-help-panel { padding: 18px; }
 }
+
+/* One continuous workspace: capture, conversation, candidate, final. */
+.creation-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 16px; }
+.creation-card { text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 12px; color: inherit; min-width: 0; }
+.creation-card strong { white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.creation-card small { opacity: .65; }
+.creation-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); align-items: start; gap: 24px; }
+.creation-grid textarea { width: 100%; box-sizing: border-box; }
+.creation-steps { padding: 0; list-style: none; display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 24px; }
+.creation-steps li { padding: 8px 14px; border-radius: 24px; background: #f0ede7; color: #6d695f; }
+.creation-steps li[aria-current] { background: #e3ebdf; color: #345640; font-weight: 600; }
+.creation-conversation summary { cursor: pointer; margin-bottom: 14px; }
+.creation-conversation h2 { margin-top: 24px; }
+.creation-messages { display: flex; flex-direction: column; gap: 16px; max-height: 540px; overflow-y: auto; margin: 20px 0; }
+.creation-message { padding: 16px; background: #f5f3ee; border-radius: 12px; overflow-wrap: anywhere; }
+.creation-message.user { margin-left: 28px; background: #ecf1e9; }
+.creation-message small { font-weight: 600; opacity: .65; }
+.creation-message p, .creation-final-text { white-space: pre-wrap; line-height: 1.7; }
+.creation-preview { position: sticky; top: 20px; }
+.creation-confirm, .creation-retry { padding: 16px; margin-top: 16px; border: 1px solid #d9d6cc; border-radius: 12px; }
+@media (max-width: 900px) { .creation-grid { grid-template-columns: 1fr; } .creation-preview { position: static; } .creation-messages { max-height: 420px; } }
+
+.content-selected { outline: 2px solid var(--accent, #789078); outline-offset: 6px; border-radius: 16px; }

@@ -48,12 +48,12 @@ with tempfile.TemporaryDirectory() as tmp:
    card=page.locator('article.engine-card').filter(has=page.get_by_role('heading',name='Codex',exact=True))
    card.get_by_role('button',name='测试连接',exact=True).click()
    expect(page.get_by_role('heading',name='安装 / 更新连接助手',exact=True)).to_be_visible()
-   expect(page.get_by_text('连接助手需要更新至 1.3.3。',exact=False)).to_be_visible()
+   expect(page.get_by_text('连接助手需要更新至 1.3.4。',exact=False)).to_be_visible()
    assert not any(path=='/engines/codex/verify' for _,path in requests)
    page.screenshot(path='/private/tmp/extension-upgrade-desktop.png',full_page=True)
-   version[0]='1.3.3'
+   version[0]='1.3.4'
    page.get_by_role('button',name='我已更新，重新检测').click()
-   expect(page.get_by_text('当前版本：1.3.3',exact=False)).to_be_visible()
+   expect(page.get_by_text('当前版本：1.3.4',exact=False)).to_be_visible()
    page.get_by_role('button',name='关闭更新指南').click()
    card.get_by_role('button',name='测试连接',exact=True).click()
    expect(page.get_by_text('已开始 Codex 真实连接测试',exact=True)).to_be_visible()

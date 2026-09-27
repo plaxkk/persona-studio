@@ -14,13 +14,13 @@
 2. 在“设置 → 写作引擎”选择链路：Codex 复用本机 ChatGPT 登录，点击“测试连接”同步本机模型并验证后即可切换，无需 DeepSeek API Key；Hermes / OpenClaw 使用各自保存的模型、兼容接口与 API Key。只有实际调用成功的引擎才可选择。切换仅影响新任务，已排队任务保留原链路；失败不会自动转发到其他供应商。
 3. 在 Chrome / Edge 安装并授权 [浏览器连接助手](browser-extension/README.md)，之后打开工作室会自动连接当前 X 账号；未登录时引导登录，登录完成自动验证并填入用户名。也可在“设置 → 账号连接”手动提供 `auth_token` / `ct0` 或 Cookie-Editor JSON。产品不读取浏览器 cookie 数据库。
 4. 首次启动保持暂停，连接检查后从首页开始运行。未连接 Telegram 也可完成全部 Web 流程。
-5. 在收件箱处理互动或写原创，编辑后的草稿自动保存。去 X 前核对浏览器当前登录账号，复制失败可手动复制，弹窗被拦可使用普通链接。
+5. 在“写推文”暂存灵感，和 AI 脑暴、反复修改候选稿，确认后生成定稿；离开再回来可以继续原来的对话。在“内容库”统一编辑定稿、归档和处理发布；互动回复在收件箱处理。编辑后的草稿自动保存。去 X 前核对浏览器当前登录账号，复制失败可手动复制，弹窗被拦可使用普通链接。
 
 X cookies 本身有写入权限；本产品通过读取模块隔离、不暴露写入方法、禁用模型工具限制行为，不能把它们称为只读凭据。X 搜索和通知不保证完整覆盖互动，界面会显示各来源成功时间与失败状态。
 
 ## 在线面板连接本机
 
-访问 https://persona-studio-plaxkk.vercel.app，安装连接助手 1.1 并在扩展内授权本机管理员账号。网页托管于 Vercel，Agent、数据库和凭据继续留在你的电脑。详见 [在线面板与本机连接说明](docs/DESKTOP_WEB.md)。
+访问 https://persona-studio-plaxkk.vercel.app，安装连接助手 1.3.4 并在扩展内授权本机管理员账号。网页托管于 Vercel，Agent、数据库和凭据继续留在你的电脑。详见 [在线面板与本机连接说明](docs/DESKTOP_WEB.md)。
 
 ## 本机安装与部署
 
@@ -57,6 +57,7 @@ npm --prefix assets/web-admin run build
 - [架构审查与验收项](docs/ARCHITECTURE_REVIEW.md)
 - [部署、迁移、备份与恢复](docs/DEPLOYMENT.md)
 - [从 Git 与 Codex 工作记录获取原创灵感](docs/work-inspiration.md)
+- [灵感到定稿的创作流程](docs/creation-workflow.md)
 - [Codex 写作与链路切换](docs/codex-writing.md)
 - [验收结果与尚待真实连接验证的范围](docs/ACCEPTANCE.md)
 

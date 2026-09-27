@@ -20,16 +20,16 @@ export function allowedRoute(path, method) {
   )
     return true;
   if (method === "GET")
-    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|interactions|messages|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/versions)?|events|diagnostics)$/.test(
+    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|interactions|messages|creations(\/[a-f0-9]{32})?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/versions)?|events|diagnostics)$/.test(
       pathname,
     );
   if (method === "POST")
-    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|interactions\/[0-9]+\/ignore|generate|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
+    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|interactions\/[0-9]+\/ignore|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
       pathname,
     );
   return (
     method === "PUT" &&
-    /^\/(settings|persona|drafts\/[a-f0-9-]+)$/.test(pathname)
+    /^\/(settings|persona|creations\/[a-f0-9]{32}|drafts\/[a-f0-9-]+)$/.test(pathname)
   );
 }
 export async function desktopMessage(message, sender) {

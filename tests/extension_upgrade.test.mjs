@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.3','1.3.10','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.3.4','1.3.10','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -25,4 +25,12 @@ test('connected handshake reports installed version and forwards Codex verificat
  assert.equal((await desktopMessage({type:'desktop.status'},sender)).extensionVersion,EXTENSION_VERSION);
  const r=await desktopMessage({type:'desktop.api',path:'/engines/codex/verify',method:'POST'},sender);
  assert.equal(r.status,200);assert.equal(called,'http://127.0.0.1:18880/api/v1/engines/codex/verify');
+});
+
+test('creation workflow routes pass through the extension',()=>{
+ const id='a'.repeat(32);
+ for (const [path,method] of [['/creations','GET'],['/creations','POST'],['/creations/'+id,'GET'],['/creations/'+id,'PUT'],['/creations/'+id+'/turn','POST'],['/creations/'+id+'/finalize','POST']]) {
+  assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true);
+ }
+ assert.equal(allowedRoute('/creations/'+id+'/delete','POST'),false);
 });

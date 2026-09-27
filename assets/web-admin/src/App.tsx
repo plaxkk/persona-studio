@@ -43,7 +43,7 @@ const nav: { id: Page; label: string; icon: typeof House }[] = [
   { id: "persona", label: "我的人格", icon: UserRound },
   { id: "inbox", label: "互动收件箱", icon: Inbox },
   { id: "compose", label: "写推文", icon: PenLine },
-  { id: "history", label: "内容记录", icon: Library },
+  { id: "history", label: "内容库", icon: Library },
   { id: "settings", label: "设置", icon: Settings },
 ];
 export default function App() {

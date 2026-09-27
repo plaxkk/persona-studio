@@ -25,7 +25,7 @@ export function TaskActivity({
         <div className="task-progress" key={t.id}>
           <LoaderCircle size={16} className="spin" />
           <span>
-            {names[t.kind] || "内容任务"} ·{" "}
+            {t.creation_id ? "创作搭档回应" : names[t.kind] || "内容任务"} ·{" "}
             {t.status === "queued" ? "等待处理" : "正在处理"}
           </span>
           <button
@@ -49,7 +49,7 @@ export function TaskActivity({
           </summary>
           {problems.map((t) => (
             <div key={t.id}>
-              <strong>{names[t.kind]}</strong>
+              <strong>{t.creation_id ? "创作搭档回应" : names[t.kind]}</strong>
               <p>
                 {t.result.conflict
                   ? "你已修改草稿，新生成内容没有覆盖原文。以下版本可供参考。"

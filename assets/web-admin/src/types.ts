@@ -36,6 +36,7 @@ export type Settings = {
   worker_heartbeat: number;
 };
 export type Task = {
+  creation_id?: string;
   id: string;
   kind: string;
   status: string;
@@ -99,6 +100,7 @@ export type Post = {
   created: number;
 };
 export type Draft = {
+  creation_id?: string;
   id: string;
   kind: string;
   text: string;

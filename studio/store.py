@@ -87,6 +87,7 @@ class Store:
             CREATE TABLE IF NOT EXISTS feedback(id INTEGER PRIMARY KEY AUTOINCREMENT,text TEXT NOT NULL,created INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS telegram_updates(id INTEGER PRIMARY KEY,created INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS notices(draft_id TEXT PRIMARY KEY,status TEXT NOT NULL,created INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS creations(id TEXT PRIMARY KEY,idea TEXT NOT NULL,candidate TEXT NOT NULL DEFAULT '',stage TEXT NOT NULL DEFAULT 'idea',version INTEGER NOT NULL DEFAULT 1,task_id TEXT,draft_id TEXT REFERENCES drafts(id),created INTEGER NOT NULL,updated INTEGER NOT NULL);
             """)
             for k, v in DEFAULTS.items():
                 c.execute(

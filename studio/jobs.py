@@ -41,6 +41,14 @@ class Jobs:
                 ).fetchone()
                 if old:
                     return old[0]
+            if payload.get('creation_id'):
+                creation = c.execute('SELECT * FROM creations WHERE id=?', (payload['creation_id'],)).fetchone()
+                if not creation or creation['version'] != payload['expected_version'] or creation['draft_id']:
+                    raise JobError('creation_conflict')
+                if creation['task_id'] and c.execute("SELECT 1 FROM tasks WHERE id=? AND status IN ('queued','running')", (creation['task_id'],)).fetchone():
+                    raise JobError('creation_busy')
+                payload['idea'] = creation['idea']
+                payload['candidate'] = creation['candidate']
             if kind in ["post", "reply", "chat", "probe"]:
                 engine = payload.get("engine") or cfg["engine"]
                 if engine not in self.engines.adapters:
@@ -94,6 +102,8 @@ class Jobs:
                 {"task_id": ident, "kind": kind, "automatic": automatic},
                 c,
             )
+            if payload.get('creation_id'):
+                c.execute("UPDATE creations SET task_id=?,stage='writing',updated=? WHERE id=?", (ident, now, payload['creation_id']))
         return ident
 
     def recover(self):
@@ -362,9 +372,18 @@ class Jobs:
             )
             if summaries:
                 context["earlier_conversation_excerpt"] = summaries[0]["text"]
+        request_text = payload.get('text', '')
+        if payload.get('creation_id'):
+            context['writing_workspace'] = {'original_idea': payload['idea'], 'current_candidate': payload['candidate']}
+            instruction = ('你是推文创作搭档。根据原始灵感、当前候选稿和此前对话回应本轮要求。不要虚构经历或数据。'
+                '脑暴时提出有区别的角度、指出缺失证据，并用简短追问帮助用户选择，不要擅自定稿。')
+            if payload['mode'] == 'draft':
+                instruction = ('根据原始灵感、当前候选稿和此前对话的选择及修改意见，生成一版推文候选稿。'
+                    '只输出推文正文，不要解释、标题标签或多份备选，不虚构经历和数据。由用户最终确认定稿。')
+            request_text = instruction + '\n\n本轮要求：' + request_text
         request = EngineRequest(
             kind,
-            payload.get("text", ""),
+            request_text,
             payload["persona"],
             context,
             history,
@@ -439,6 +458,12 @@ class Jobs:
             if task["cancel"] or (paused and kind != "chat"):
                 raise EngineError("cancelled")
             if kind == "chat":
+                if payload.get('creation_id'):
+                    creation = c.execute('SELECT * FROM creations WHERE id=?', (payload['creation_id'],)).fetchone()
+                    if not creation or creation['version'] != payload['expected_version'] or creation['draft_id']:
+                        raise EngineError('creation_conflict')
+                    c.execute('UPDATE creations SET candidate=?,version=version+1,updated=? WHERE id=?',
+                        (text if payload['mode'] == 'draft' else creation['candidate'], int(time.time()), payload['creation_id']))
                 for role, value in [
                     ("user", sanitize(payload["text"], self.secrets.all().values())),
                     ("assistant", text),

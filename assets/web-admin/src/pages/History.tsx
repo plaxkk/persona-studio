@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Studio, Actions } from "../types";
-import { Heading, Empty } from "../components/UI";
+import { Heading, Empty, Button } from "../components/UI";
 import { DraftEditor } from "../components/DraftEditor";
 import { time } from "../api";
 export default function History({
@@ -10,7 +10,12 @@ export default function History({
   data: Studio;
   actions: Actions;
 }) {
-  const [filter, setFilter] = useState("draft");
+  const [selected] = useState(() => sessionStorage.getItem("content-selected"));
+  const [filter, setFilter] = useState(selected ? "all" : "draft");
+  useEffect(() => {
+    if (selected) document.getElementById("content-" + selected)?.scrollIntoView({block: "center"});
+    sessionStorage.removeItem("content-selected");
+  }, [selected]);
   const drafts = data.drafts.filter(
     (d) => filter === "all" || d.status === filter,
   );
@@ -18,7 +23,7 @@ export default function History({
     <>
       <Heading
         title="每一次表达，都留下来"
-        description="打开 X、用户确认和平台验证是不同的事。这里如实记录你的操作。"
+        description="这里保留定稿、回复草稿与发布操作。尚未成稿的想法和脑暴，请到写推文继续。"
       />
       <div className="tabs">
         {[
@@ -39,12 +44,14 @@ export default function History({
       {drafts.length ? (
         <div className="draft-list">
           {drafts.map((d) => (
+            <div key={d.id} id={"content-" + d.id} className={selected === d.id ? "content-selected" : undefined}>
+            {d.creation_id && <Button onClick={() => { sessionStorage.setItem("creation-selected", d.creation_id!); actions.navigate("compose"); }}>回看灵感与创作对话</Button>}
             <DraftEditor
-              key={d.id}
               draft={d}
               username={data.overview.settings.x_username}
               actions={actions}
             />
+            </div>
           ))}
         </div>
       ) : (

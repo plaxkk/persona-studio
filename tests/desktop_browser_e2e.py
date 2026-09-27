@@ -138,14 +138,18 @@ async def main():
                 await expect(
                     web.get_by_text("已连接这台电脑", exact=True)
                 ).to_be_visible(timeout=15000)
-                await expect(web.get_by_role("link", name="下载连接助手 v1.3.3")).to_be_visible()
+                await expect(web.get_by_role("link", name="下载连接助手 v1.3.4")).to_be_visible()
                 await web.get_by_role("button", name="安装 / 更新指南", exact=True).click()
                 await expect(web.get_by_role("region", name="连接助手安装与更新")).to_be_visible()
                 await web.get_by_role("button", name="关闭更新指南").click()
                 await web.get_by_role("button", name="写推文", exact=True).click()
                 text = "这是模拟桌面草稿\n中文 🌱 & 特殊字符"
-                await web.get_by_label("给角色一个方向").fill(text)
-                await web.get_by_role("button", name="自己写，保存草稿").click()
+                await web.get_by_label("灵感、观察或工作片段").fill(text)
+                await web.get_by_role("button", name="保存并开始创作").click()
+                await web.get_by_label("推文正文", exact=True).fill(text)
+                await web.get_by_role("button", name="确认定稿", exact=True).click()
+                await web.get_by_role("button", name="保存为最终稿", exact=True).click()
+                await web.get_by_role("button", name="到内容库查看定稿", exact=True).click()
                 await expect(web.get_by_label("草稿正文")).to_have_value(text)
                 assert (
                     app.state.store.rows("SELECT text FROM drafts")[0]["text"] == text
@@ -270,7 +274,8 @@ async def main():
                 # Unexpected disconnect preserves the compose editor in memory.
                 await web.set_viewport_size({"width": 1280, "height": 900})
                 await web.get_by_role("button", name="写推文", exact=True).click()
-                await web.get_by_label("给角色一个方向").fill("断线后要保留的想法")
+                await web.get_by_role("button", name="返回灵感库", exact=True).click()
+                await web.get_by_label("灵感、观察或工作片段").fill("断线后要保留的想法")
                 await web.evaluate(
                     "window.dispatchEvent(new Event('desktop-disconnected'))"
                 )
@@ -297,7 +302,7 @@ async def main():
                 while not server.started:
                     await asyncio.sleep(0.05)
                 await web.get_by_role("button", name="我已授权，连接这台电脑").click()
-                await expect(web.get_by_label("给角色一个方向")).to_have_value(
+                await expect(web.get_by_label("灵感、观察或工作片段")).to_have_value(
                     "断线后要保留的想法"
                 )
                 # Revocation is enforced in the backend and extension session.

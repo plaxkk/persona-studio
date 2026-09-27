@@ -105,14 +105,18 @@ with tempfile.TemporaryDirectory(prefix="studio-browser-") as folder:
         page.get_by_role("button", name="暂停运行", exact=True).wait_for()
         nav("写推文")
         text = "【模拟验收】中文\n换行 🥰 & ? # + / ="
-        page.get_by_label("给角色一个方向").fill(text)
-        page.get_by_role("button", name="自己写，保存草稿", exact=True).click()
+        page.get_by_label("灵感、观察或工作片段").fill(text)
+        page.get_by_role("button", name="保存并开始创作", exact=True).click()
+        page.get_by_label("推文正文", exact=True).fill(text)
+        page.get_by_role("button", name="确认定稿", exact=True).click()
+        page.get_by_role("button", name="保存为最终稿", exact=True).click()
+        page.get_by_role("button", name="到内容库查看定稿", exact=True).click()
         editor = page.get_by_label("草稿正文", exact=True).first
         editor.wait_for()
         assert editor.input_value() == text
         editor.fill(text + "手工编辑")
         nav("工作室")
-        nav("写推文")
+        nav("内容库")
         assert (
             page.get_by_label("草稿正文", exact=True).first.input_value()
             == text + "手工编辑"
@@ -142,7 +146,7 @@ with tempfile.TemporaryDirectory(prefix="studio-browser-") as folder:
             "https://x.com/test/status/9999999999999999999"
         )
         page.get_by_role("button", name="确认完成", exact=True).click()
-        nav("内容记录")
+        nav("内容库")
         page.get_by_role("button", name="用户确认完成", exact=True).click()
         page.get_by_text("用户确认完成 · 未经平台验证", exact=False).wait_for()
         # Safe reply association with a large string ID; never contact X.
@@ -224,7 +228,7 @@ with tempfile.TemporaryDirectory(prefix="studio-browser-") as folder:
                 "我的人格",
                 "互动收件箱",
                 "写推文",
-                "内容记录",
+                "内容库",
                 "设置",
             ]:
                 nav(name)
@@ -239,8 +243,13 @@ with tempfile.TemporaryDirectory(prefix="studio-browser-") as folder:
             page.get_by_role("button", name="发送试聊", exact=True).click()
             page.wait_for_timeout(1000)
             nav("写推文")
-            page.get_by_label("给角色一个方向").fill("手机端手写草稿")
-            page.get_by_role("button", name="自己写，保存草稿", exact=True).click()
+            page.get_by_role("button", name="返回灵感库", exact=True).click()
+            page.get_by_label("灵感、观察或工作片段").fill("手机端手写草稿")
+            page.get_by_role("button", name="保存并开始创作", exact=True).click()
+            page.get_by_label("推文正文", exact=True).fill("手机端手写草稿")
+            page.get_by_role("button", name="确认定稿", exact=True).click()
+            page.get_by_role("button", name="保存为最终稿", exact=True).click()
+            page.get_by_role("button", name="到内容库查看定稿", exact=True).click()
             page.get_by_label("草稿正文", exact=True).first.wait_for()
             nav("设置")
             page.get_by_role("button", name="写作引擎", exact=True).click()

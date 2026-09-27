@@ -33,6 +33,8 @@ from .xreader import XReader, ReadError
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = {
+    "creation_conflict": "创作记录已变化，请重新打开最新记录。",
+    "creation_busy": "这条灵感正在生成，请等待或停止后再试。",
     "paused": "已暂停。请先在首页恢复同步与生成。",
     "engine_not_ready": "请先在设置中完成引擎连接测试。",
     "unsupported_engine": "此引擎尚未接入。",
@@ -447,6 +449,7 @@ def create_app(state_dir=None, public_url=None):
                 "error",
             ]
         } | {
+            "creation_id": json.loads(row["payload"]).get("creation_id"),
             "message": ERRORS.get(row["error"], ""),
             "result": json.loads(row["result"]),
         }
@@ -900,7 +903,7 @@ def create_app(state_dir=None, public_url=None):
     @app.get("/api/v1/drafts", dependencies=[Depends(session)])
     def drafts():
         return store.rows(
-            "SELECT drafts.*,posts.url AS source_url,posts.text AS source_text,posts.author AS source_author FROM drafts LEFT JOIN posts ON posts.id=drafts.post_id ORDER BY drafts.updated DESC LIMIT 200"
+            "SELECT drafts.*,creations.id AS creation_id,posts.url AS source_url,posts.text AS source_text,posts.author AS source_author FROM drafts LEFT JOIN posts ON posts.id=drafts.post_id LEFT JOIN creations ON creations.draft_id=drafts.id ORDER BY drafts.updated DESC LIMIT 200"
         )
 
     @app.post("/api/v1/drafts", dependencies=[Depends(session)])
@@ -1023,6 +1026,8 @@ def create_app(state_dir=None, public_url=None):
     from .persona_routes import register
 
     register(app, store, session, allowed_hosts)
+    from .creation_routes import register as register_creations
+    register_creations(app, store, jobs, session, vault)
 
     static = ROOT / "assets/web-admin/dist"
     if (static / "assets").exists():
