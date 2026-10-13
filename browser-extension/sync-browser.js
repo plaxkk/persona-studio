@@ -12,18 +12,20 @@ async function read(tabId, account, action) {
   return result[0]?.result || { state: "waiting_browser" };
 }
 
-async function ready(tabId, account, action) {
-  for (let attempt = 0; attempt < 16; attempt++) {
+async function ready(tabId, account, action, expectedUrl = "") {
+  for (let attempt = 0; attempt < 60; attempt++) {
     try {
       const tab = await chrome.tabs.get(tabId);
-      if (tab.status === "complete") {
+      // tabs.update can return while Chrome still reports the previous page as
+      // complete. Never inspect its DOM as if it belonged to the new route.
+      if (tab.status === "complete" && (!expectedUrl || tab.url === expectedUrl)) {
         const result = await read(tabId, account, action);
         if (result.state !== "waiting_browser") return result;
       }
     } catch {
       return { state: "waiting_browser" };
     }
-    await delay(400);
+    await delay(500);
   }
   return { state: "waiting_browser" };
 }
@@ -61,7 +63,7 @@ export async function operateSync(action) {
   if (detail) {
     const url = `https://x.com/${action.author}/status/${action.post_id}`;
     if (tab.url !== url) await chrome.tabs.update(tab.id, { url });
-    result = await ready(tab.id, account, { kind: "sync_detail", author: action.author, post_id: action.post_id });
+    result = await ready(tab.id, account, { kind: "sync_detail", author: action.author, post_id: action.post_id }, url);
     if (result.state !== "ready" || result.post_id !== action.post_id || String(result.author || "").toLowerCase() !== action.author.toLowerCase())
       return { state: result.state === "ready" ? "source_error" : result.state };
     return result;
@@ -72,7 +74,7 @@ export async function operateSync(action) {
   }
   if (action.source === "timeline") {
     // The home page defaults to For you. The Following tab is the requested source.
-    const identity = await ready(tab.id, account, { kind: "identity" });
+    const identity = await ready(tab.id, account, { kind: "identity" }, url);
     if (identity.state !== "ready") return identity;
     let selected = false;
     for (let attempt = 0; attempt < 12 && !selected; attempt++) {
@@ -90,7 +92,7 @@ export async function operateSync(action) {
     }
     if (!selected) return { state: "source_error" };
   }
-  result = await ready(tab.id, account, { kind: "sync_snapshot", source: action.source });
+  result = await ready(tab.id, account, { kind: "sync_snapshot", source: action.source }, url);
   if (result.state !== "ready") return result;
   // A stale page, redirect, or search mismatch cannot be called a successful read.
   const page = String(result.page || "");
