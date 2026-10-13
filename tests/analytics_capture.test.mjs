@@ -75,6 +75,33 @@ test('Overview XHR capture keeps current and previous windows without headers', 
   assert.equal(queryMatchesOverview(captured), true);
 });
 
+test('Overview fetch capture retains business data while leaving response usable', async () => {
+  const body = JSON.stringify({ data: { viewer_v2: { user_results: { result: {
+    current_time_series: [], previous_totals: [],
+  } } } }, request_headers: { authorization: 'must-not-leak' } });
+  const response = { status: 200, clone: () => ({ text: async () => body }) };
+  const window = { fetch: async () => response };
+  const location = { origin: 'https://x.com',
+    pathname: '/i/account_analytics/overview',
+    href: 'https://x.com/i/account_analytics/overview' };
+  const source = fs.readFileSync(new URL('../browser-extension/analytics-capture.js', import.meta.url), 'utf8');
+  vm.runInNewContext(source, { window, location, XMLHttpRequest: FakeXHR,
+    URL, TextEncoder, Date, JSON });
+  const variables = encodeURIComponent(JSON.stringify({
+    current_from_iso: '2026-09-16T00:00:00.000Z',
+    current_to_iso: '2026-10-14T00:00:00.000Z',
+    prev_from_iso: '2026-08-19T00:00:00.000Z',
+    prev_to_iso: '2026-09-16T00:00:00.000Z',
+  }));
+  const target = `https://x.com/i/api/graphql/hash/accountOverviewDailyQuery?variables=${variables}`;
+  assert.equal(await window.fetch(target), response);
+  await new Promise((resolve) => setImmediate(resolve));
+  const captured = window.__personaStudioTakeAnalytics();
+  assert.equal(captured.query_kind, 'overview');
+  assert.equal(JSON.stringify(captured).includes('authorization'), false);
+  assert.equal(window.__personaStudioTakeAnalytics(), null);
+});
+
 test('query window must match the requested range', () => {
   const record = { query_kind: 'content', from_time: '2026-09-15T00:00:00Z',
     to_time: '2026-10-13T00:00:00Z', max_results: 1000 };

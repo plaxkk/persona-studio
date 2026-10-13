@@ -22,21 +22,20 @@
     value: take, configurable: false, writable: false,
   });
 
-  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this.__personaStudioAnalyticsQuery = null;
+  const queryFor = (method, url) => {
     try {
       const target = new URL(String(url), location.href);
       if (["GET", "POST"].includes(String(method).toUpperCase()) &&
           target.origin === location.origin &&
           /^\/i\/api\/graphql\/[^/]+\/(contentPageQuery|accountOverviewDailyQuery)$/.test(target.pathname)) {
         const queryKind = target.pathname.endsWith("/contentPageQuery") ? "content" : "overview";
-        if (queryKind !== pageKind) return originalOpen.call(this, method, url, ...rest);
+        if (queryKind !== pageKind) return null;
         const variables = JSON.parse(target.searchParams.get("variables") || "{}");
         if (pageKind === "content" && variables && typeof variables === "object" &&
             variables.from_time != null && variables.to_time != null &&
             Number.isInteger(variables.max_results) &&
             variables.max_results >= 1 && variables.max_results <= 10_000) {
-          this.__personaStudioAnalyticsQuery = {
+          return {
             query_kind: "content",
             from_time: String(variables.from_time),
             to_time: String(variables.to_time),
@@ -45,7 +44,7 @@
         } else if (pageKind === "overview" && variables && typeof variables === "object" &&
                    ["current_from_iso", "current_to_iso", "prev_from_iso", "prev_to_iso"]
                      .every((key) => typeof variables[key] === "string")) {
-          this.__personaStudioAnalyticsQuery = {
+          return {
             query_kind: "overview",
             from_time: variables.current_from_iso,
             to_time: variables.current_to_iso,
@@ -55,6 +54,23 @@
         }
       }
     } catch { /* Other X requests are outside the Analytics collector. */ }
+    return null;
+  };
+
+  const capture = (query, text) => {
+    try {
+      if (typeof text !== "string" ||
+          new TextEncoder().encode(text).length > MAX_RESPONSE_BYTES) return;
+      const response = JSON.parse(text);
+      if (!response || typeof response.data !== "object" || !response.data) return;
+      pending.push({ ...query, observed_at: Math.floor(Date.now() / 1000),
+        captured_at_ms: Date.now(), payload: { data: response.data } });
+      while (pending.length > 2) pending.shift();
+    } catch { /* Changed or non-JSON X responses are not treated as data. */ }
+  };
+
+  XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    this.__personaStudioAnalyticsQuery = queryFor(method, url);
     return originalOpen.call(this, method, url, ...rest);
   };
 
@@ -62,16 +78,26 @@
     const query = this.__personaStudioAnalyticsQuery;
     if (query) this.addEventListener("loadend", () => {
       if (this.status !== 200) return;
-      try {
-        const text = this.responseText;
-        if (new TextEncoder().encode(text).length > MAX_RESPONSE_BYTES) return;
-        const response = JSON.parse(text);
-        if (!response || typeof response.data !== "object" || !response.data) return;
-        pending.push({ ...query, observed_at: Math.floor(Date.now() / 1000),
-          captured_at_ms: Date.now(), payload: { data: response.data } });
-        while (pending.length > 2) pending.shift();
-      } catch { /* Changed or non-JSON X responses are not treated as data. */ }
+      capture(query, this.responseText);
     }, { once: true });
     return originalSend.apply(this, args);
   };
+
+  if (typeof window.fetch === "function") {
+    const originalFetch = window.fetch;
+    window.fetch = function (input, init) {
+      const query = queryFor(init?.method || input?.method || "GET",
+        typeof input === "string" ? input : input?.url);
+      const request = originalFetch.apply(this, arguments);
+      if (!query) return request;
+      return request.then((response) => {
+        if (response.status === 200) {
+          try {
+            response.clone().text().then((text) => capture(query, text)).catch(() => {});
+          } catch { /* A non-cloneable response is ignored. */ }
+        }
+        return response;
+      });
+    };
+  }
 })();
