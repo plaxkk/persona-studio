@@ -25,7 +25,6 @@ import type {
   Actions,
   Overview,
   Draft,
-  Post,
   Connections,
   Message,
 } from "./types";
@@ -68,14 +67,13 @@ export default function App() {
     [],
   );
   const refresh = useCallback(async () => {
-    const [overview, drafts, posts, connections, messages] = await Promise.all([
+    const [overview, drafts, connections, messages] = await Promise.all([
       api<Overview>("/overview"),
       api<Draft[]>("/drafts"),
-      api<Post[]>("/interactions"),
       api<Connections>("/connections"),
       api<Message[]>("/messages"),
     ]);
-    setData({ overview, drafts, posts, connections, messages });
+    setData({ overview, drafts, connections, messages });
     setBrand(overview.settings.brand);
   }, []);
   useEffect(() => {

@@ -31,6 +31,7 @@ from .security import (
 from .engines import Engines, EngineError
 from .jobs import Jobs, JobError
 from .xreader import XReader, ReadError
+from .interactions import candidate_ids, context_state, enrich_rows, reply_block, topic_for, scene_for
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = {
@@ -64,6 +65,10 @@ ERRORS = {
     "not_connected": "请填写连接凭据。",
     "post_missing": "原帖不存在。",
     "risk_skipped": "内容不适合自动生成，已跳过。",
+    "context_incomplete": "还缺少原帖上下文，请先补全再准备回复。",
+    "reply_exists": "这条原帖已有一条待审回复，请继续修改现有草稿。",
+    "reply_daily_limit": "今天已准备 20 条回复草稿，请先审核现有内容。",
+    "reply_author_limit": "今天已为这位作者准备两条新回复，继续交流请从已有对话进入。",
 }
 
 
@@ -155,6 +160,21 @@ class Corpus(Input):
     content: str = Field(max_length=1_000_000)
 
 
+class InteractionReview(Input):
+    context_note: str = Field(default="", max_length=3000)
+    contribution: str = Field(default="", max_length=2000)
+    evidence: str = Field(default="", max_length=2000)
+    decision: str = Field(default="", pattern=r"^(|adopted|edited|discarded)$")
+    decision_reason: str = Field(default="", max_length=1000)
+
+
+class InteractionSkill(Input):
+    name: str = Field(min_length=1, max_length=100)
+    level: str = Field(pattern=r"^(practiced|learning|want|uncertain)$")
+    evidence: str = Field(default="", max_length=1000)
+    confirmed: bool = False
+
+
 def create_app(state_dir=None, public_url=None):
     root = Path(
         state_dir or os.environ.get("STUDIO_STATE_DIR", ROOT / ".local/state")
@@ -237,7 +257,7 @@ def create_app(state_dir=None, public_url=None):
                 {},
                 headers={
                     "Access-Control-Allow-Origin": EXTENSION_ORIGIN,
-                    "Access-Control-Allow-Methods": "GET, POST, PUT",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE",
                     "Access-Control-Allow-Headers": "content-type, x-studio-device",
                 },
             )
@@ -839,6 +859,86 @@ def create_app(state_dir=None, public_url=None):
                     )
         return rows
 
+    @app.get("/api/v1/interactions/page", dependencies=[Depends(session)])
+    def interaction_page(view: str = "new", topic: str = "all", q: str = "", offset: int = 0, limit: int = 25):
+        if view not in ("new", "recommended", "direct", "pending", "all", "ignored", "skipped") or topic not in ("all", "developer", "travel", "other") or not 0 <= offset <= 100000 or not 1 <= limit <= 50 or len(q) > 100:
+            fail("筛选条件无效", 422)
+        rows = store.rows("SELECT * FROM posts WHERE kind!='own' ORDER BY created DESC,id DESC")
+        candidate_order = candidate_ids(store) if view == "recommended" else []
+        recommended = set(candidate_order)
+        selected = []
+        for row in rows:
+            context = json.loads(row["context"])
+            if q.strip() and q.strip().casefold() not in (row["text"] + " " + row["author"]).casefold(): continue
+            if view == "recommended" and row["id"] not in recommended: continue
+            if view == "direct" and (row["status"] != "new" or scene_for(row, context) != "direct"): continue
+            if view == "pending" and (row["status"] != "new" or context_state(context)[0] != "pending"): continue
+            if view in ("new", "ignored", "skipped") and row["status"] != view: continue
+            selected.append(row)
+        if view == "recommended":
+            order = {p: i for i, p in enumerate(candidate_order)}
+            selected.sort(key=lambda r: order.get(r["id"], 1000))
+        counts = {name: sum(topic_for(row["text"]) == name for row in selected) for name in ("developer", "travel", "other")}
+        if topic != "all":
+            selected = [row for row in selected if topic_for(row["text"]) == topic]
+        page = enrich_rows(store, selected[offset:offset + limit])
+        return {"items": page, "total": len(selected), "offset": offset, "limit": limit, "topics": counts}
+
+    @app.get("/api/v1/interactions/skills", dependencies=[Depends(session)])
+    def interaction_skills():
+        return store.rows("SELECT * FROM interaction_skills ORDER BY level,id")
+
+    @app.post("/api/v1/interactions/skills", dependencies=[Depends(session)])
+    def create_interaction_skill(body: InteractionSkill):
+        if body.confirmed and body.level == "practiced" and not body.evidence.strip():
+            fail("已实践的能力需要填写项目出处。", 422)
+        now = int(time.time())
+        with store.db(True) as c:
+            ident = c.execute("INSERT INTO interaction_skills(name,level,evidence,confirmed,created,updated) VALUES(?,?,?,?,?,?)",
+                (body.name.strip(), body.level, body.evidence.strip(), int(body.confirmed), now, now)).lastrowid
+        return store.rows("SELECT * FROM interaction_skills WHERE id=?", (ident,))[0]
+
+    @app.put("/api/v1/interactions/skills/{skill_id}", dependencies=[Depends(session)])
+    def edit_interaction_skill(skill_id: int, body: InteractionSkill):
+        if body.confirmed and body.level == "practiced" and not body.evidence.strip():
+            fail("已实践的能力需要填写项目出处。", 422)
+        with store.db(True) as c:
+            if not c.execute("SELECT id FROM interaction_skills WHERE id=?", (skill_id,)).fetchone():
+                fail("能力条目不存在。", 404)
+            c.execute("UPDATE interaction_skills SET name=?,level=?,evidence=?,confirmed=?,updated=? WHERE id=?",
+                (body.name.strip(), body.level, body.evidence.strip(), int(body.confirmed), int(time.time()), skill_id))
+        return store.rows("SELECT * FROM interaction_skills WHERE id=?", (skill_id,))[0]
+
+    @app.delete("/api/v1/interactions/skills/{skill_id}", dependencies=[Depends(session)])
+    def delete_interaction_skill(skill_id: int):
+        with store.db(True) as c:
+            c.execute("DELETE FROM interaction_skills WHERE id=?", (skill_id,))
+        return {"ok": True}
+
+    @app.post("/api/v1/interactions/{post_id}/context", dependencies=[Depends(session)])
+    def read_interaction_context(post_id: str):
+        if not re.fullmatch(r"\d+", post_id) or not store.rows("SELECT id FROM posts WHERE id=? AND kind!='own'", (post_id,)):
+            fail("post_missing", 404)
+        from .browser_reads import BrowserReads
+        if not BrowserReads(store).connected(7): fail("连接助手需要更新至 1.3.7，才能读取原帖详情。", 409)
+        return {"task_id": jobs.enqueue("context", {"post_ids": [post_id]}, dedupe="context:" + post_id)}
+
+    @app.put("/api/v1/interactions/{post_id}/review", dependencies=[Depends(session)])
+    def review_interaction(post_id: str, body: InteractionReview):
+        note = sanitize(body.context_note.strip(), vault.all().values())
+        if note and len(note) < 20: fail("请至少用 20 字说明在 X 核对到的上下文。", 422)
+        with store.db(True) as c:
+            row = c.execute("SELECT context FROM posts WHERE id=? AND kind!='own'", (post_id,)).fetchone()
+            if not row: fail("post_missing", 404)
+            context = json.loads(row["context"])
+            if note:
+                context["manual_context_note"] = note
+                c.execute("UPDATE posts SET context=? WHERE id=?", (json.dumps(context, ensure_ascii=False), post_id))
+            status, issue = context_state(context)
+            c.execute("INSERT INTO interaction_reviews(post_id,context_status,context_issue,contribution,evidence,decision,decision_reason,updated) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(post_id) DO UPDATE SET context_status=excluded.context_status,context_issue=excluded.context_issue,contribution=excluded.contribution,evidence=excluded.evidence,decision=excluded.decision,decision_reason=excluded.decision_reason,updated=excluded.updated",
+                (post_id,status,issue,sanitize(body.contribution, vault.all().values()),sanitize(body.evidence, vault.all().values()),body.decision,sanitize(body.decision_reason, vault.all().values()),int(time.time())))
+        return {"ok": True, "context_status": status}
+
     @app.post("/api/v1/interactions/{post_id}/ignore", dependencies=[Depends(session)])
     def ignore(post_id: str):
         with store.db() as c:
@@ -853,6 +953,9 @@ def create_app(state_dir=None, public_url=None):
             "SELECT id FROM posts WHERE id=?", (body.post_id,)
         ):
             fail("post_missing", 404)
+        if body.kind == "reply" and not body.draft_id:
+            blocked = reply_block(store, str(body.post_id or ""))
+            if blocked: fail(blocked, 409)
         if body.kind == "chat" and not body.text.strip():
             fail("请输入聊天内容", 422)
         if body.draft_id:
@@ -919,9 +1022,16 @@ def create_app(state_dir=None, public_url=None):
             "SELECT id FROM posts WHERE id=?", (body.post_id,)
         ):
             fail("post_missing", 404)
-        ident = store.draft(
-            sanitize(body.text, vault.all().values()), body.kind, body.post_id
-        )
+        if body.kind == "reply":
+            blocked = reply_block(store, str(body.post_id or ""))
+            if blocked: fail(blocked, 409)
+        with store.db(True) as c:
+            if body.kind == "reply":
+                blocked = reply_block(store, str(body.post_id or ""), c)
+                if blocked: fail(blocked, 409)
+            ident = store.draft(
+                sanitize(body.text, vault.all().values()), body.kind, body.post_id, c=c
+            )
         return store.rows("SELECT * FROM drafts WHERE id=?", (ident,))[0]
 
     @app.put("/api/v1/drafts/{draft_id}", dependencies=[Depends(session)])

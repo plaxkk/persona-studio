@@ -7,7 +7,7 @@ test('website version tracks extension package and handles legacy versions',()=>
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
  for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.6','1.3.10','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of ['1.3.7','1.3.10','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -33,4 +33,15 @@ test('creation workflow routes pass through the extension',()=>{
   assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true);
  }
  assert.equal(allowedRoute('/creations/'+id+'/delete','POST'),false);
+});
+test('interaction paging and review are scoped to the local bridge',()=>{
+ assert.equal(allowedRoute('/interactions/page?view=all&offset=200&limit=25&q=%E6%97%85%E8%A1%8C','GET'),true);
+ assert.equal(allowedRoute('/interactions/skills','GET'),true);
+ assert.equal(allowedRoute('/interactions/skills','POST'),true);
+ assert.equal(allowedRoute('/interactions/skills/3','PUT'),true);
+ assert.equal(allowedRoute('/interactions/skills/3','DELETE'),true);
+ assert.equal(allowedRoute('/interactions/123/context','POST'),true);
+ assert.equal(allowedRoute('/interactions/123/review','PUT'),true);
+ assert.equal(allowedRoute('/interactions/page?url=https%3A%2F%2Fevil.example','GET'),false);
+ assert.equal(allowedRoute('/interactions/123/review','GET'),false);
 });

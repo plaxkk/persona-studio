@@ -98,8 +98,40 @@ export type Post = {
     suggestion?: string;
     source?: string;
     published_at?: number | null;
+    manual_context_note?: string;
+    media?: { kind: string; description: string }[];
+    truncated?: boolean;
+    media_pending?: boolean;
   };
   created: number;
+  draft?: Draft | null;
+  review?: {
+    context_status: "ready" | "pending";
+    context_issue: string;
+    topic: "developer" | "travel" | "other";
+    scene: "direct" | "question" | "discussion";
+    scenario?: string;
+    score: Record<string, { value: number; reason: string }>;
+    score_total: number | null;
+    contribution: string;
+    evidence: string;
+    decision: string;
+    decision_reason: string;
+  };
+};
+export type InteractionPage = {
+  items: Post[];
+  total: number;
+  offset: number;
+  limit: number;
+  topics: { developer: number; travel: number; other: number };
+};
+export type InteractionSkill = {
+  id: number;
+  name: string;
+  level: "practiced" | "learning" | "want" | "uncertain";
+  evidence: string;
+  confirmed: number;
 };
 export type Draft = {
   creation_id?: string;
@@ -142,7 +174,6 @@ export type Message = {
 export type Studio = {
   overview: Overview;
   drafts: Draft[];
-  posts: Post[];
   connections: Connections;
   messages: Message[];
 };

@@ -1,10 +1,16 @@
 export const CLOUD_ORIGIN = "https://persona-studio-plaxkk.vercel.app";
 export function allowedRoute(path, method) {
-  if (typeof path !== "string" || path.length > 2000 || /[\\%#]/.test(path))
+  if (typeof path !== "string" || path.length > 2000 || /[\\#]/.test(path))
     return false;
   const [pathname, query] = path.split("?");
-  if (query && (method !== "GET" || !["/memory", "/events"].includes(pathname)))
+  if (/%/.test(pathname) || path.split("?").length > 2) return false;
+  if (query && (method !== "GET" || !["/memory", "/events", "/interactions/page"].includes(pathname)))
     return false;
+  if (query && pathname === "/interactions/page") {
+    const params = new URLSearchParams(query);
+    if ([...params].some(([key, value]) => !["view", "topic", "q", "offset", "limit"].includes(key) || value.length > 120) ||
+        [...params.keys()].length !== new Set(params.keys()).size) return false;
+  }
   if (
     method === "GET" &&
     /^\/persona-imports(?:\/(?:preflight|[a-f0-9]{32}(?:\/export)?))?$/.test(
@@ -20,16 +26,17 @@ export function allowedRoute(path, method) {
   )
     return true;
   if (method === "GET")
-    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|interactions|messages|creations(\/[a-f0-9]{32})?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/versions)?|events|diagnostics)$/.test(
+    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|interactions(\/(page|skills))?|messages|creations(\/[a-f0-9]{32})?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/versions)?|events|diagnostics)$/.test(
       pathname,
     );
   if (method === "POST")
-    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|interactions\/[0-9]+\/ignore|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
+    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
       pathname,
     );
+  if (method === "DELETE") return /^\/interactions\/skills\/[0-9]+$/.test(pathname);
   return (
     method === "PUT" &&
-    /^\/(settings|persona|creations\/[a-f0-9]{32}|drafts\/[a-f0-9-]+)$/.test(pathname)
+    /^\/(settings|persona|creations\/[a-f0-9]{32}|drafts\/[a-f0-9-]+|interactions\/([0-9]+\/review|skills\/[0-9]+))$/.test(pathname)
   );
 }
 export async function desktopMessage(message, sender) {

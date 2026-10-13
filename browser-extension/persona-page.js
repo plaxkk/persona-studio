@@ -34,6 +34,54 @@ export async function readPersonaPage(action, expected) {
     if (primary.querySelector('[role="progressbar"]') || (!empty && !emptyMessage))
       return { state: "waiting_browser" };
   }
+  if (action.kind === "sync_detail") {
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d+$/.test(action.post_id || ""))
+      return { state: "invalid_request" };
+    if (location.pathname.toLowerCase() !== `/${action.author.toLowerCase()}/status/${action.post_id}`)
+      return { state: "source_error" };
+    const articles = [...primary.querySelectorAll('article[data-testid="tweet"]')];
+    const key = `/${action.author.toLowerCase()}/status/${action.post_id}`;
+    const index = articles.findIndex((article) =>
+      [...article.querySelectorAll("time")].some((node) =>
+        !node.closest('[data-testid="quoteTweet"]') &&
+        node.closest("a")?.getAttribute("href")?.toLowerCase() === key));
+    if (index < 0) return { state: "waiting_browser" };
+    const article = articles[index];
+    const expand = article.querySelector('[data-testid="tweet-text-show-more-link"]');
+    if (expand) {
+      expand.click();
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    function extract(node, quoted = false) {
+      const text = [...node.querySelectorAll('[data-testid="tweetText"]')]
+        .find((element) => quoted || !element.closest('[data-testid="quoteTweet"]'))?.innerText || "";
+      const href = [...node.querySelectorAll("time")]
+        .find((element) => quoted || !element.closest('[data-testid="quoteTweet"]'))
+        ?.closest("a")?.getAttribute("href") || "";
+      const match = href.match(/^\/([A-Za-z0-9_]+)\/status\/(\d+)$/);
+      return { text: text.slice(0, 10000), author: match?.[1] || "",
+        id: match?.[2] || "", url: match ? `https://x.com${href}` : "" };
+    }
+    const main = extract(article);
+    if (!main.text || main.id !== action.post_id || main.author.toLowerCase() !== action.author.toLowerCase())
+      return { state: "source_error" };
+    const quoteNode = article.querySelector('[data-testid="quoteTweet"]');
+    const quote = quoteNode ? extract(quoteNode, true) : null;
+    const preface = article.innerText.split(main.text)[0] || "";
+    const parentNeeded = /Replying to|回复\s?@|回复给|正在回复/.test(preface);
+    const parent = parentNeeded && index > 0 ? extract(articles[index - 1]) : null;
+    const media = [...article.querySelectorAll('[data-testid="tweetPhoto"] img, video')]
+      .filter((node) => !node.closest('[data-testid="quoteTweet"]'))
+      .map((node) => ({ kind: node.tagName.toLowerCase(),
+        description: (node.getAttribute("alt") || node.getAttribute("aria-label") || "").slice(0, 500) }));
+    return { state: "ready", account, post_id: action.post_id, author: action.author,
+      record: { ...main, created_at: article.querySelector("time")?.dateTime || "",
+        parent_needed: parentNeeded, parent: parent?.text ? parent : null,
+        quote_needed: !!quoteNode, quote: quote?.text ? quote : null,
+        media, media_pending: media.length > 0,
+        truncated: !!article.querySelector('[data-testid="tweet-text-show-more-link"]'),
+        browser_context: preface.slice(0, 2000) } };
+  }
   const prior = globalThis.__personaTargets;
   if (["expand", "original", "detail"].includes(action.kind)) {
     const t = prior?.targets?.get(action.target);

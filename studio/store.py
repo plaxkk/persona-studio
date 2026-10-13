@@ -115,6 +115,29 @@ class Store:
             c.execute(
                 "INSERT OR IGNORE INTO migrations VALUES(2,?)", (int(time.time()),)
             )
+            if not c.execute("SELECT 1 FROM migrations WHERE version=3").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS interaction_context_reads(
+                    id INTEGER PRIMARY KEY, task_id TEXT NOT NULL, post_id TEXT NOT NULL,
+                    author TEXT NOT NULL, account TEXT NOT NULL, status TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '{}', updated INTEGER NOT NULL,
+                    UNIQUE(task_id,post_id));
+                CREATE TABLE IF NOT EXISTS interaction_reviews(
+                    post_id TEXT PRIMARY KEY REFERENCES posts(id), context_status TEXT NOT NULL DEFAULT 'pending',
+                    context_issue TEXT NOT NULL DEFAULT '', topic TEXT NOT NULL DEFAULT 'other',
+                    scene TEXT NOT NULL DEFAULT 'discussion', score TEXT NOT NULL DEFAULT '{}',
+                    score_total INTEGER, contribution TEXT NOT NULL DEFAULT '',
+                    evidence TEXT NOT NULL DEFAULT '', decision TEXT NOT NULL DEFAULT '',
+                    decision_reason TEXT NOT NULL DEFAULT '', updated INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS interaction_skills(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+                    level TEXT NOT NULL, evidence TEXT NOT NULL DEFAULT '',
+                    confirmed INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL,
+                    updated INTEGER NOT NULL);
+                CREATE INDEX IF NOT EXISTS interaction_posts_page ON posts(kind,status,created DESC,id DESC);
+                CREATE INDEX IF NOT EXISTS interaction_posts_author ON posts(author,created DESC);
+                """)
+                c.execute("INSERT INTO migrations VALUES(3,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

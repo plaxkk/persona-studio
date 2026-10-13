@@ -146,7 +146,7 @@ def register(app, store, session, allowed_hosts):
                     break
                 if msg.get("type") == "result":
                     if action and action.get('transport') == 'sync':
-                        if int(msg.get('id', -1)) == action['id']:
+                        if str(msg.get('id', '')) == str(action['id']):
                             reads.receive(action['id'], msg.get('data'))
                         continue
                     imports.receive(

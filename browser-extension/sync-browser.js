@@ -42,7 +42,9 @@ function sourceUrl(source, account) {
 
 export async function operateSync(action) {
   const account = String(action.account || "");
-  if (!/^[A-Za-z0-9_]{1,15}$/.test(account) || !SOURCES.has(action.source))
+  const detail = action.kind === "context_read";
+  if (!/^[A-Za-z0-9_]{1,15}$/.test(account) ||
+      (detail ? !/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d+$/.test(action.post_id || "") : !SOURCES.has(action.source)))
     return { state: "invalid_request" };
   const saved = (await chrome.storage.session.get(TAB_KEY))[TAB_KEY];
   let tab;
@@ -56,6 +58,14 @@ export async function operateSync(action) {
   }
   let result = await ready(tab.id, account, { kind: "identity" });
   if (result.state !== "ready") return result;
+  if (detail) {
+    const url = `https://x.com/${action.author}/status/${action.post_id}`;
+    if (tab.url !== url) await chrome.tabs.update(tab.id, { url });
+    result = await ready(tab.id, account, { kind: "sync_detail", author: action.author, post_id: action.post_id });
+    if (result.state !== "ready" || result.post_id !== action.post_id || String(result.author || "").toLowerCase() !== action.author.toLowerCase())
+      return { state: result.state === "ready" ? "source_error" : result.state };
+    return result;
+  }
   const url = sourceUrl(action.source, account);
   if (tab.url !== url) {
     await chrome.tabs.update(tab.id, { url });

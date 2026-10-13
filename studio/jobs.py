@@ -11,6 +11,7 @@ from .xreader import XReader, ReadError
 from .inspiration import collect_work
 from .sync_status import failed as sync_failed
 from .browser_reads import BrowserReads
+from .interactions import candidate_ids, reply_block
 
 
 class JobError(Exception):
@@ -51,6 +52,10 @@ class Jobs:
                     raise JobError('creation_busy')
                 payload['idea'] = creation['idea']
                 payload['candidate'] = creation['candidate']
+            if kind == "reply" and not payload.get("draft_id"):
+                blocked = reply_block(self.store, str(payload.get("post_id") or ""), c)
+                if blocked:
+                    raise JobError(blocked)
             if kind in ["post", "reply", "chat", "probe"]:
                 engine = payload.get("engine") or cfg["engine"]
                 if engine not in self.engines.adapters:
@@ -116,7 +121,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] == "sync" else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -285,6 +290,17 @@ class Jobs:
                 )
             except JobError:
                 break
+        if browser.connected(7):
+            pending = []
+            for post_id in candidate_ids(self.store):
+                item = self.store.rows("SELECT context FROM posts WHERE id=?", (post_id,))[0]
+                if not json.loads(item['context']).get('detail_checked'):
+                    pending.append(post_id)
+            if pending:
+                try:
+                    self.enqueue("context", {"post_ids": pending}, automatic=True, dedupe="context")
+                except JobError:
+                    pass
         return {"new": len(new), "complete": result["complete"]}
 
     async def generate(self, job):
@@ -307,6 +323,9 @@ class Jobs:
         context = {}
         post = None
         if kind == "reply":
+            if not payload.get('draft_id'):
+                blocked = reply_block(self.store, str(payload.get('post_id') or ''))
+                if blocked: raise EngineError(blocked)
             rows = self.store.rows(
                 "SELECT * FROM posts WHERE id=?", (payload["post_id"],)
             )
@@ -528,14 +547,10 @@ class Jobs:
                     (target, version, text, int(time.time())),
                 )
             else:
-                if (
-                    job["automatic"]
-                    and post
-                    and c.execute(
-                        "SELECT 1 FROM drafts WHERE post_id=?", (post["id"],)
-                    ).fetchone()
-                ):
-                    return {"skipped": "draft_exists"}
+                if post:
+                    blocked = reply_block(self.store, post["id"], c)
+                    if blocked:
+                        return {"skipped": blocked}
                 target = self.store.draft(
                     text, kind, post["id"] if post else None, result.engine, c
                 )
@@ -554,12 +569,14 @@ class Jobs:
     async def run(self, job):
         try:
             result = await (
-                self.sync(job) if job["kind"] == "sync" else self.generate(job)
+                self.sync(job) if job["kind"] == "sync" else
+                BrowserReads(self.store).enrich(job, self.alive) if job["kind"] == "context" else
+                self.generate(job)
             )
             self.finish(job, "succeeded", result)
         except (ReadError, EngineError, JobError) as exc:
             code = exc.code
-            if isinstance(exc, ReadError) and code != 'cancelled':
+            if isinstance(exc, ReadError) and code != 'cancelled' and job['kind'] == 'sync':
                 sync_failed(self.store, code)
                 self.store.set(
                     "x_status",

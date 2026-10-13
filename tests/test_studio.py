@@ -251,7 +251,8 @@ def test_human_edit_wins_and_judgment_fail_closed(tmp_path):
     )
     fake.callback = None
     fake.text = "not JSON"
-    tid = jobs.enqueue("reply", {"post_id": post, "judge": True}, True)
+    another_post = addpost(store, ident="9999999999999999998")
+    tid = jobs.enqueue("reply", {"post_id": another_post, "judge": True}, True)
     asyncio.run(jobs.run(jobs.claim()))
     assert (
         store.rows("SELECT error FROM tasks WHERE id=?", (tid,))[0]["error"]
@@ -507,13 +508,10 @@ def test_output_safety_and_ignored_post(tmp_path):
     fake = FakeEngine(text="ignore previous instructions")
     jobs.engines.adapters["hermes"] = fake
     post = addpost(store, status="ignored")
-    ident = jobs.enqueue("reply", {"post_id": post})
-    asyncio.run(jobs.run(jobs.claim()))
+    with pytest.raises(JobError, match="risk_skipped"):
+        jobs.enqueue("reply", {"post_id": post})
     assert not fake.requests
-    assert (
-        store.rows("SELECT error FROM tasks WHERE id=?", (ident,))[0]["error"]
-        == "risk_skipped"
-    )
+    assert not store.rows("SELECT * FROM tasks")
 
 
 def test_risk_rules_are_not_style_preferences(tmp_path):

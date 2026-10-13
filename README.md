@@ -20,7 +20,7 @@ X cookies 本身有写入权限；本产品通过读取模块隔离、不暴露�
 
 ## 在线面板连接本机
 
-访问 https://persona-studio-plaxkk.vercel.app，安装连接助手 1.3.5 并在扩展内授权本机管理员账号。网页托管于 Vercel，Agent、数据库和凭据继续留在你的电脑。详见 [在线面板与本机连接说明](docs/DESKTOP_WEB.md)。
+访问 https://persona-studio-plaxkk.vercel.app，安装连接助手 1.3.7 并在扩展内授权本机管理员账号。网页托管于 Vercel，Agent、数据库和凭据继续留在你的电脑。详见 [在线面板与本机连接说明](docs/DESKTOP_WEB.md)。
 
 ## 本机安装与部署
 
