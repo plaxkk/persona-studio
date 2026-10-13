@@ -16,6 +16,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { Analytics } from "@vercel/analytics/react";
 import { desktopMode } from "./desktop";
 import { api, setCsrf } from "./api";
 import type {
@@ -332,6 +333,7 @@ export default function App() {
           </div>
         </div>
         {notification}
+        <Analytics />
       </div>
     );
   return (
@@ -466,6 +468,7 @@ export default function App() {
         )}
       </main>
       {notification}
+      <Analytics />
     </div>
   );
 }
