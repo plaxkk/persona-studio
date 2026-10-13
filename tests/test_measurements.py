@@ -24,7 +24,7 @@ def test_v3_confirmed_draft_migrates_without_inventing_timestamps(tmp_path):
     assert row['user_confirmed'] == 1 and row['tweet_id'] == '123'
     assert row['user_confirmed_at'] is None and row['platform_observed_at'] is None and row['published_at'] is None
     assert store.rows("SELECT reason FROM draft_versions WHERE draft_id='old'")[0]['reason'] == ''
-    assert store.rows("SELECT max(version) AS version FROM migrations")[0]['version'] == 4
+    assert store.rows("SELECT max(version) AS version FROM migrations")[0]['version'] == 5
 
 
 def test_confirmed_publication_stays_unverified_until_browser_read(tmp_path):

@@ -57,7 +57,7 @@ def parse_content_page(payload: dict, *, from_time: str, to_time: str,
     if not isinstance(payload, dict) or not from_time or not to_time or max_results < 1 or observed_at < 1:
         raise AnalyticsShapeError("content_request_invalid")
     results = _tweet_results(payload)
-    posts, gaps = [], []
+    posts, gaps, seen_ids = [], [], set()
     for index, outer in enumerate(results):
         if not isinstance(outer, dict):
             gaps.append({"index": index, "post_id": None, "reason": "invalid_item"})
@@ -73,15 +73,19 @@ def parse_content_page(payload: dict, *, from_time: str, to_time: str,
         else:
             details = result.get("details")
             metrics = _metrics(result.get("organic_metrics_total"))
-            if (re.fullmatch(r"\d+", post_id) and isinstance(details, dict)
+            if post_id in seen_ids:
+                reason = "duplicate_post"
+            elif (re.fullmatch(r"\d+", post_id) and isinstance(details, dict)
                     and isinstance(details.get("created_at_ms"), int)
                     and details["created_at_ms"] > 0
                     and isinstance(details.get("full_text"), str)
                     and details["full_text"].strip() and metrics is not None):
                 posts.append({"post_id": post_id, "created_at_ms": details["created_at_ms"],
                               "text": details["full_text"], "metrics": metrics})
+                seen_ids.add(post_id)
                 continue
-            reason = "invalid_tweet"
+            else:
+                reason = "invalid_tweet"
         gaps.append({"index": index, "post_id": post_id or None, "reason": reason})
     return {
         "source": "subscription_content_posts",

@@ -197,6 +197,34 @@ class Store:
                     c.execute("INSERT OR IGNORE INTO draft_publications(draft_id,tweet_id,url,author,user_confirmed,publication_kind) VALUES(?,?,?,?,1,?)",
                               (row['id'], match[2] if match else None, url, match[1] if match else None, 'reply' if row['kind'] == 'reply' else 'post'))
                 c.execute("INSERT INTO migrations VALUES(4,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=5").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS analytics_runs(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL, source TEXT NOT NULL,
+                    window_from TEXT NOT NULL, window_to TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL, request_limit INTEGER NOT NULL,
+                    received_count INTEGER NOT NULL, parsed_count INTEGER NOT NULL,
+                    gap_count INTEGER NOT NULL, at_request_limit INTEGER NOT NULL,
+                    parser_version INTEGER NOT NULL, raw_json TEXT NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS analytics_runs_pending
+                    ON analytics_runs(cloud_status,cloud_retry_at,observed_at);
+                CREATE TABLE IF NOT EXISTS analytics_post_metrics(
+                    run_id TEXT NOT NULL REFERENCES analytics_runs(id),
+                    post_id TEXT NOT NULL, published_at_ms INTEGER NOT NULL,
+                    text TEXT NOT NULL, metrics_json TEXT NOT NULL,
+                    PRIMARY KEY(run_id,post_id));
+                CREATE INDEX IF NOT EXISTS analytics_post_history
+                    ON analytics_post_metrics(post_id,run_id);
+                CREATE TABLE IF NOT EXISTS analytics_coverage_gaps(
+                    run_id TEXT NOT NULL REFERENCES analytics_runs(id),
+                    item_index INTEGER NOT NULL, post_id TEXT,
+                    reason TEXT NOT NULL, PRIMARY KEY(run_id,item_index));
+                """)
+                c.execute("INSERT INTO migrations VALUES(5,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):
