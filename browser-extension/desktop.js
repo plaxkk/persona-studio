@@ -30,7 +30,7 @@ export function allowedRoute(path, method) {
       pathname,
     );
   if (method === "POST")
-    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|growth\/read|analytics\/content\/read|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive|metrics\/read))?|backup)$/.test(
+    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|growth\/read|analytics\/content\/(read|backfill)|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive|metrics\/read))?|backup)$/.test(
       pathname,
     );
   if (method === "DELETE") return /^\/interactions\/skills\/[0-9]+$/.test(pathname);

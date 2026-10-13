@@ -33,7 +33,7 @@ from .jobs import Jobs, JobError
 from .xreader import XReader, ReadError
 from .interactions import candidate_ids, context_state, enrich_rows, reply_block, topic_for, scene_for
 from .supabase_analytics import SupabaseConfigError, _config as check_supabase_config, configured as supabase_configured
-from .analytics_browser_reads import CONTENT_DAYS
+from .analytics_browser_reads import CONTENT_DAYS, valid_date_range, backfill_windows
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = {
@@ -134,6 +134,13 @@ class SupabaseConfig(Input):
 
 class AnalyticsContentRequest(Input):
     days: int = 28
+    from_date: str | None = None
+    to_date: str | None = None
+
+
+class AnalyticsBackfillRequest(Input):
+    from_date: str
+    to_date: str
 
 
 class Generate(Input):
@@ -793,6 +800,7 @@ def create_app(state_dir=None, public_url=None):
         from .browser_reads import BrowserReads
         return {
             "browser_ready": BrowserReads(store).connected(11),
+            "history_ready": BrowserReads(store).connected(12),
             "runs": store.rows(
                 "SELECT id,account,source,window_from,window_to,observed_at,"
                 "request_limit,received_count,parsed_count,gap_count,"
@@ -800,19 +808,47 @@ def create_app(state_dir=None, public_url=None):
                 "FROM analytics_runs ORDER BY observed_at DESC,id DESC LIMIT 20"),
             "tasks": store.rows(
                 "SELECT id,status,created,updated,error,result FROM tasks "
-                "WHERE kind='analytics_content' ORDER BY created DESC,id DESC LIMIT 10"),
+                "WHERE kind='analytics_content' ORDER BY created DESC,id DESC LIMIT 40"),
         }
 
     @app.post("/api/v1/analytics/content/read", dependencies=[Depends(session)])
     def read_analytics_content(body: AnalyticsContentRequest):
         from .browser_reads import BrowserReads
-        if body.days not in CONTENT_DAYS:
+        custom = body.from_date is not None or body.to_date is not None
+        if custom and not valid_date_range(body.from_date, body.to_date):
+            fail("历史日期须在今天以前，且单次不超过 31 天。", 422)
+        if not custom and body.days not in CONTENT_DAYS:
             fail("请选择 7、14、28 或 90 天的数据范围。", 422)
-        if not BrowserReads(store).connected(11):
-            fail("连接助手需要更新至 1.3.11，才能读取 Subscription Analytics。", 409)
+        version = 12 if custom else 11
+        if not BrowserReads(store).connected(version):
+            fail(f"连接助手需要更新至 1.3.{version}，才能读取所选 Subscription Analytics 范围。", 409)
+        payload = ({"from_date": body.from_date, "to_date": body.to_date} if custom
+                   else {"days": body.days})
+        key = (f"analytics-content-{body.from_date}-{body.to_date}" if custom
+               else f"analytics-content-{body.days}")
         return {"task_id": jobs.enqueue(
-            "analytics_content", {"days": body.days},
-            dedupe=f"analytics-content-{body.days}")}
+            "analytics_content", payload, dedupe=key)}
+
+    @app.post("/api/v1/analytics/content/backfill", dependencies=[Depends(session)])
+    def backfill_analytics_content(body: AnalyticsBackfillRequest):
+        from .browser_reads import BrowserReads
+        windows = backfill_windows(body.from_date, body.to_date)
+        if windows is None:
+            fail("历史补采范围须在今天以前，且最长为 365 天。", 422)
+        if not BrowserReads(store).connected(12):
+            fail("连接助手需要更新至 1.3.12，才能分批补采历史数据。", 409)
+        now = int(time.time())
+        queued, skipped = [], 0
+        for start, end in windows:
+            key = f"analytics-content-{start}-{end}"
+            if store.rows("SELECT 1 FROM tasks WHERE dedupe=? AND status='succeeded' LIMIT 1", (key,)):
+                skipped += 1
+                continue
+            queued.append(jobs.enqueue(
+                "analytics_content", {"from_date": start, "to_date": end},
+                dedupe=key, available=now + len(queued) * 300))
+        return {"task_ids": queued, "queued": len(queued), "skipped_succeeded": skipped,
+                "windows": len(windows)}
 
     @app.put("/api/v1/connections/supabase", dependencies=[Depends(session)])
     def connect_supabase(body: SupabaseConfig):

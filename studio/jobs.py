@@ -28,7 +28,8 @@ class Jobs:
         self.secrets = Secrets(store.root)
         self.last_measurement_schedule = 0
 
-    def enqueue(self, kind, payload=None, automatic=False, dedupe=None):
+    def enqueue(self, kind, payload=None, automatic=False, dedupe=None,
+                available=None):
         payload = dict(payload or {})
         now = int(time.time())
         ident = uuid.uuid4().hex
@@ -102,7 +103,7 @@ class Jobs:
                     dedupe,
                     now,
                     now,
-                    now,
+                    max(now, int(available)) if available is not None else now,
                 ),
             )
             self.store.event(
@@ -225,6 +226,24 @@ class Jobs:
         if not browser.connected(8): return
         account = self.store.get('x_username','')
         if not account: return
+        if browser.connected(11):
+            # Refresh the most useful Analytics window once a day. A failed
+            # browser read waits an hour before another automatic attempt.
+            key = 'analytics-content-28'
+            latest = self.store.rows(
+                "SELECT status,error,created FROM tasks WHERE dedupe=? "
+                "ORDER BY created DESC,id DESC LIMIT 1", (key,))
+            last = latest[0] if latest else None
+            transient = {'source_error', 'browser_offline', 'timeout'}
+            interval = (3600 if last and last['status'] == 'failed' and
+                        last['error'] in transient else 86400)
+            if not last or (last['status'] not in ('queued', 'running') and
+                            now - last['created'] >= interval):
+                try:
+                    self.enqueue('analytics_content', {'days': 28},
+                                 automatic=True, dedupe=key)
+                except JobError:
+                    pass
         day = datetime.now(ZoneInfo(self.store.get('timezone','Asia/Shanghai'))).date().isoformat()
         if not self.store.rows("SELECT id FROM profile_snapshots WHERE account=? AND day=? LIMIT 1",(account,day)):
             key = 'profile:' + day

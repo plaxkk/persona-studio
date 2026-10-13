@@ -239,6 +239,10 @@ class Store:
                     ON analytics_browser_reads(status,updated);
                 """)
                 c.execute("INSERT INTO migrations VALUES(6,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=7").fetchone():
+                c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN from_date TEXT")
+                c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN to_date TEXT")
+                c.execute("INSERT INTO migrations VALUES(7,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

@@ -24,6 +24,8 @@ Content 列表调用 `contentPageQuery`，变量键为 `from_time`、`to_time`�
 
 再次在 `Replies` 的 2W 筛选核对到请求方法为 GET，变量中的 `from_time`、`to_time` 为字符串，`max_results` 为数字，两时间边界相差约 14 天；HTTP 状态为 200。此次临时探针也已移除。连接助手因此按 `contentPageQuery` 的实际 URL 与变量结构截取响应，而不是按页面上的按钮文字推断读取范围。
 
+Content 的日期控件允许选择较早的自定义窗口。实际在 `Replies` 选 2026-06-01 至 2026-06-14 后，页面 URL 带 `from=2026-06-01&to=2026-06-14`，同次 `contentPageQuery` 请求的 `from_time=2026-06-01T00:00:00.000Z`、`to_time=2026-06-14T23:59:59.999Z`、`max_results=1000`，方法为 GET。检查后已恢复原来的 2W 筛选。历史补采可以使用这组已实测的 URL 参数，但必须以实际请求边界为准，不能只凭日历显示判定采集成功。
+
 Content detail 分别调用 `postDetailsProviderQuery`（正文与公开计数）、`postDetailsProviderMetricsTotalQuery`（11 类累计指标）、`postDetailsProviderFirst48HoursDataQuery`、`postDetailsProviderLast48HoursOrganicDataQuery`、`postDetailsProviderRealtimeDataQuery` 和 `postDetailsProviderAudienceQuery`。前两项以 `rest_id` 查询；累计指标另带 `requested_metrics`、`from_time`、`to_time`。时间序列项含 `metric_values` 与 `timestamp.iso8601_time`，某些指标只有 `metric_type` 而无 `metric_value`，应记未知而非零。详情受众项含国家或年龄、性别、设备、关系等维度及 `count`、`engagement_type`、毫秒时间戳；其分布不是粉丝画像。
 
 Audience 页面调用 `audienceOverviewDataQuery`，变量键为 `from_time_incl`、`to_time_excl`、`dimensions`、`heatmap_from_time_incl`、`heatmap_to_time_excl`、`requested_metrics`。响应包含 `organic_metrics_time_series`（指标值及 ISO 时间）、`uec_country_metrics_daily_time_series_count`（国家、行为、计数、毫秒时间）和 `uec_metrics_daily_time_series_count`（年龄、性别、设备、关注关系、行为、计数、毫秒时间）。所见 28 天 Likes 页面仅国家有可见分布，其余多个卡片显示样本不足；只有在核对筛选指标和分母后才能重建百分比。
@@ -38,4 +40,5 @@ Audience 页面调用 `audienceOverviewDataQuery`，变量键为 `from_time_incl
 - 真实 3M Posts 响应的 `JSON.stringify` 长度约 87.4 万字符，UTF-8 约 91.1 万字节；按当前 Python WebSocket 入站检查的默认 ASCII 转义方式重新序列化，约 96.7 万字符，超过 95 万字符上限。因此，不能把 3M 原始响应作为单条连接助手消息传输。采集端须按较短日期窗口或有序分片传输，并在本机校验每片大小、顺序、总数、请求条件和完整性后入库；任何分片丢失都要标记该窗口未完成。窗口进一步拆分时仍需记录查询上限，不能把低于上限等同于完整历史。
 - 连接助手 1.3.10 的开发分支已加入大结果分片传输：每片 Base64 载荷不超过 98,304 字节，整条结果不超过 8.5 MB，本机校验任务 ID、片序、片数和 SHA-256 后才交给原读取处理器；缺片、错序或校验失败不会入库。该版本只有传输能力，没有 Analytics 业务采集；1.3.11 的接入范围见下。
 - 连接助手 1.3.11 的开发分支已把该分片协议接入 Content 业务采集：在新开的 X Analytics 页面提前监听 XHR，只保留 200 响应中的 `data`，不保留 Cookie、请求头和鉴权参数；核对已登录账号、实际查询窗口、读取时间和业务 JSON 结构后，再用任务 ID 幂等写入 SQLite。页面可手动发起最近 28 天或近 3 个月的读取，显示返回数量、解析缺口、查询上限及待传云端状态。模拟本机 Chrome XHR、超过 95 万字符的分片 WebSocket、数据库 2→6 迁移及前端界面已验证。**真实账号上的连接助手 1.3.11 尚未安装，真实 Analytics 读取、完整历史补采及 Supabase 写入核对均未验收；03B 不得标记为已上线。**
+- 连接助手 1.3.12 的开发分支可读取单个自定义历史窗口，并按实际返回的 UTC 起止时间核对页面所选日期。本机可把不超过 365 天的历史范围拆成最多 28 天一段，按至少 5 分钟间隔排队；同一窗口已成功的任务不会重复入队，失败窗口可重试。最近 28 天的窗口在新连接助手在线时每日自动补读，临时失败至少隔一小时再试。实际账号中这些新任务尚未执行；查询达到 1000 项上限的窗口仍须细分，受限帖子仍是覆盖缺口，不能宣称历史已完整。
 - 已准备 `deployment/supabase_analytics.sql` 私有表结构和本机补传函数。项目地址在本机 SQLite 设置中保存，`SUPABASE_SECRET_KEY` 只写入本机权限为 0600 的私密配置；本机设置页可保存/移除连接，在线面板仅看状态。只接受 `https://*.supabase.co` 与新式 `sb_secret_` 密钥；HTTP 不跟随重定向。一次运行先按 ID upsert 原始业务响应与覆盖缺口，再分批按 `(run_id,post_id)` upsert 规范化指标；所有远端写入成功才在本地标已同步，失败留待退避重试。后台每 30 秒尝试一项并显示待传数、最近状态和错误码；模拟 503 与断线后的幂等补传已验证。真实项目尚未配置，真实写入与查询仍未验收。

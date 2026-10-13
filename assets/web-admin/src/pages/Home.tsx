@@ -13,6 +13,7 @@ import { Heading, Button, Badge, Step, Empty } from "../components/UI";
 type Growth = { goal: { target_followers: number } | null; profile: { followers: number | null; observed_at: number; bio: string | null; pinned_tweet_id: string | null } | null; remaining: number | null };
 type AnalyticsContent = {
   browser_ready: boolean;
+  history_ready: boolean;
   runs: { id: string; window_from: string; window_to: string; observed_at: number;
     received_count: number; parsed_count: number; gap_count: number;
     at_request_limit: number; cloud_status: string }[];
@@ -29,6 +30,8 @@ export default function Home({
     s = o.settings;
   const [growth, setGrowth] = useState<Growth | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsContent | null>(null);
+  const [historyFrom, setHistoryFrom] = useState("");
+  const [historyTo, setHistoryTo] = useState("");
   const [target, setTarget] = useState(1000);
   useEffect(() => {
     api<Growth>("/growth").then((value) => { setGrowth(value); setTarget(value.goal?.target_followers || 1000); }).catch(() => setGrowth(null));
@@ -121,6 +124,15 @@ export default function Home({
           <Button disabled={!analytics?.browser_ready} onClick={() => void actions.run(() => api("/analytics/content/read", "POST", { days: 28 }), "已加入最近 28 天读取队列")}>读取最近 28 天</Button>
           <Button disabled={!analytics?.browser_ready} onClick={() => void actions.run(() => api("/analytics/content/read", "POST", { days: 90 }), "已加入近 3 个月读取队列")}>读取近 3 个月</Button>
         </div>
+        <div className="draft-tools">
+          <label>历史起始日期 <input type="date" value={historyFrom} onChange={(event) => setHistoryFrom(event.target.value)} /></label>
+          <label>历史结束日期 <input type="date" value={historyTo} onChange={(event) => setHistoryTo(event.target.value)} /></label>
+          <Button disabled={!analytics?.history_ready || !historyFrom || !historyTo} onClick={() => void actions.run(() => api("/analytics/content/read", "POST", { from_date: historyFrom, to_date: historyTo }), "已加入历史窗口读取队列")}>读取所选历史</Button>
+          <Button disabled={!analytics?.history_ready || !historyFrom || !historyTo} onClick={() => void actions.run(() => api("/analytics/content/backfill", "POST", { from_date: historyFrom, to_date: historyTo }), "已安排历史分批补采")}>分批补采所选范围</Button>
+          {!analytics?.history_ready && <small>历史窗口读取需连接助手 1.3.12；单次最多 31 天。</small>}
+        </div>
+        <small>单次读取最多 31 天；分批补采最多 365 天，每段不超过 28 天。已成功的相同窗口会跳过，达到查询上限的窗口仍需进一步拆分。</small>
+        {analytics?.tasks.length ? <small>最近任务：{analytics.tasks.filter((task) => task.status === "queued").length} 个排队、{analytics.tasks.filter((task) => task.status === "running").length} 个读取中、{analytics.tasks.filter((task) => task.status === "succeeded").length} 个完成、{analytics.tasks.filter((task) => task.status === "failed").length} 个失败（最近 {analytics.tasks.length} 项）。</small> : null}
         {analytics?.tasks[0] && <p>最近任务：{label(analytics.tasks[0].status)}{analytics.tasks[0].error ? ` · ${label(analytics.tasks[0].error)}` : ""}。</p>}
         {analytics?.runs[0] ? <p>最近实际读取：{time(analytics.runs[0].observed_at)}，查询窗口 {analytics.runs[0].window_from} 至 {analytics.runs[0].window_to}；返回 {analytics.runs[0].received_count} 项，可解析 {analytics.runs[0].parsed_count} 项，缺口 {analytics.runs[0].gap_count} 项{analytics.runs[0].at_request_limit ? "；已达到单次查询上限，需进一步拆分" : ""}。云端状态：{label(analytics.runs[0].cloud_status)}。</p> : <p>暂无读取记录。</p>}
       </section>

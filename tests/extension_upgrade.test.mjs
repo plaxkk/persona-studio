@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.11','1.3.12','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.3.12','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -57,6 +57,7 @@ test('growth and publication metrics routes stay scoped to the local bridge',()=
 test('Subscription analytics read routes are specific and credentials stay local',()=>{
  assert.equal(allowedRoute('/analytics/content','GET'),true);
  assert.equal(allowedRoute('/analytics/content/read','POST'),true);
+ assert.equal(allowedRoute('/analytics/content/backfill','POST'),true);
  assert.equal(allowedRoute('/analytics/content/read','GET'),false);
  assert.equal(allowedRoute('/analytics/content/export','POST'),false);
  assert.equal(allowedRoute('/connections/supabase','PUT'),false);

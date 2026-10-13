@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { operateAnalyticsContent, queryMatchesDays } from '../browser-extension/analytics-browser.js';
+import { operateAnalyticsContent, queryMatchesDays, queryMatchesDates } from '../browser-extension/analytics-browser.js';
 
 class FakeXHR {
   listeners = [];
@@ -46,6 +46,15 @@ test('query window must match the requested range', () => {
   assert.equal(queryMatchesDays({ ...record, max_results: -1 }, 28), false);
 });
 
+test('custom historical window requires the exact observed X date boundaries', () => {
+  const record = { from_time: '2026-06-01T00:00:00.000Z',
+    to_time: '2026-06-14T23:59:59.999Z', max_results: 1000 };
+  assert.equal(queryMatchesDates(record, '2026-06-01', '2026-06-14'), true);
+  assert.equal(queryMatchesDates(record, '2026-06-02', '2026-06-14'), false);
+  assert.equal(queryMatchesDates(record, '2026-06-01', '2026-07-03'), false);
+  assert.equal(queryMatchesDates(record, '2026-02-30', '2026-03-01'), false);
+});
+
 test('browser read verifies account and window before returning data', async () => {
   let removed = false;
   const record = { from_time: '2026-09-15T00:00:00Z',
@@ -62,4 +71,21 @@ test('browser read verifies account and window before returning data', async () 
   assert.equal(result.state, 'ready');
   assert.equal(result.record, record);
   assert.equal(removed, true);
+});
+
+test('historical read opens X custom range and validates the returned query', async () => {
+  let opened = '';
+  const record = { from_time: '2026-06-01T00:00:00.000Z',
+    to_time: '2026-06-14T23:59:59.999Z', max_results: 1000,
+    payload: { data: { viewer_v2: { user_results: { result: { tweets_results: [] } } } } } };
+  globalThis.chrome = { tabs: {
+    create: async ({ url }) => { opened = url; return { id: 8 }; },
+    get: async () => ({ status: 'complete', url: opened }),
+    remove: async () => {},
+  }, scripting: { executeScript: async ({ world }) => [{ result: world === 'ISOLATED'
+    ? { state: 'ready', account: 'kkplayit' } : record }] } };
+  const result = await operateAnalyticsContent({ account: 'kkplayit', days: 0,
+    from_date: '2026-06-01', to_date: '2026-06-14' });
+  assert.equal(result.state, 'ready');
+  assert.match(opened, /from=2026-06-01&to=2026-06-14$/);
 });
