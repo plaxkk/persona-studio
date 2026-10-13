@@ -36,3 +36,40 @@ REVOKE ALL ON TABLE public.persona_analytics_runs FROM anon, authenticated;
 REVOKE ALL ON TABLE public.persona_analytics_post_metrics FROM anon, authenticated;
 GRANT ALL ON TABLE public.persona_analytics_runs TO service_role;
 GRANT ALL ON TABLE public.persona_analytics_post_metrics TO service_role;
+
+CREATE TABLE IF NOT EXISTS public.persona_analytics_overview_runs (
+    id text PRIMARY KEY,
+    account text NOT NULL,
+    window_from text NOT NULL,
+    window_to text NOT NULL,
+    previous_from text NOT NULL,
+    previous_to text NOT NULL,
+    observed_at bigint NOT NULL,
+    point_count integer NOT NULL,
+    gap_count integer NOT NULL,
+    parser_version integer NOT NULL,
+    scalars jsonb NOT NULL,
+    raw_payload jsonb NOT NULL,
+    coverage_gaps jsonb NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.persona_analytics_overview_points (
+    run_id text NOT NULL REFERENCES public.persona_analytics_overview_runs(id),
+    series text NOT NULL,
+    item_index integer NOT NULL,
+    metric_index integer NOT NULL,
+    timestamp_ms bigint NOT NULL,
+    metric_type text NOT NULL,
+    count double precision,
+    verified boolean,
+    PRIMARY KEY (run_id, series, item_index, metric_index)
+);
+CREATE INDEX IF NOT EXISTS persona_analytics_overview_history
+    ON public.persona_analytics_overview_runs(account, observed_at DESC);
+
+ALTER TABLE public.persona_analytics_overview_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.persona_analytics_overview_points ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.persona_analytics_overview_runs FROM anon, authenticated;
+REVOKE ALL ON TABLE public.persona_analytics_overview_points FROM anon, authenticated;
+GRANT ALL ON TABLE public.persona_analytics_overview_runs TO service_role;
+GRANT ALL ON TABLE public.persona_analytics_overview_points TO service_role;

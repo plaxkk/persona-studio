@@ -8,12 +8,14 @@ from .store import Store
 from .jobs import Jobs
 from .telegram import Telegram
 from .codex_persona import CodexPersonaRunner
-from .supabase_analytics import sync_one_content_run
+from .supabase_analytics import sync_one_content_run, sync_one_overview_run
 
 
 async def sync_analytics_cloud(store):
     try:
-        result = await asyncio.to_thread(sync_one_content_run, store)
+        content = await asyncio.to_thread(sync_one_content_run, store)
+        overview = await asyncio.to_thread(sync_one_overview_run, store)
+        result = overview if overview["status"] != "idle" else content
     except Exception:
         # The worker must keep running; neither exception text nor credentials
         # are copied into logs or the public diagnostics endpoint.

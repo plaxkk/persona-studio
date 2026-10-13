@@ -47,15 +47,16 @@ export function queryMatchesDates(record, from, to) {
     record.max_results <= 10_000;
 }
 
-export async function operateAnalyticsContent(action) {
-  const account = String(action.account || "");
-  const days = action.days;
-  const custom = validDateRange(action.from_date, action.to_date);
-  if (!/^[A-Za-z0-9_]{1,15}$/.test(account) ||
-      !(DAYS.has(days) || (days === 0 && custom)))
-    return { state: "invalid_request" };
-  const range = custom ? `from=${action.from_date}&to=${action.to_date}` : `days=${days}`;
-  const url = `https://x.com/i/account_analytics/content?type=posts&sort=impressions&dir=desc&${range}`;
+export function queryMatchesOverview(record) {
+  const from = seconds(record?.from_time), to = seconds(record?.to_time);
+  const prevFrom = seconds(record?.prev_from), prevTo = seconds(record?.prev_to);
+  return [from, to, prevFrom, prevTo].every(Number.isFinite) &&
+    26 <= (to - from) / 86400 && (to - from) / 86400 <= 30 &&
+    26 <= (prevTo - prevFrom) / 86400 &&
+    (prevTo - prevFrom) / 86400 <= 30 && Math.abs(prevTo - from) < 60;
+}
+
+async function captureAnalytics(account, url, path, valid) {
   let tab;
   try {
     // A new tab gives every job its own page and captured request. We never
@@ -66,7 +67,7 @@ export async function operateAnalyticsContent(action) {
       if (current.status === "complete") {
         if (current.url?.startsWith("https://x.com/i/flow/login"))
           return { state: "waiting_login" };
-        if (!current.url?.startsWith("https://x.com/i/account_analytics/content"))
+        if (!current.url?.startsWith(`https://x.com${path}`))
           return { state: "source_error" };
         const identity = await chrome.scripting.executeScript({
           target: { tabId: tab.id }, world: "ISOLATED",
@@ -82,9 +83,7 @@ export async function operateAnalyticsContent(action) {
           });
           const record = captured[0]?.result;
           if (record) {
-            if (!(custom ? queryMatchesDates(record, action.from_date, action.to_date)
-                         : queryMatchesDays(record, days)) ||
-                !record.payload?.data?.viewer_v2?.user_results?.result?.tweets_results)
+            if (!valid(record))
               return { state: "source_error" };
             return { state: "ready", account, record };
           }
@@ -98,4 +97,33 @@ export async function operateAnalyticsContent(action) {
   } finally {
     if (tab?.id) await chrome.tabs.remove(tab.id).catch(() => {});
   }
+}
+
+export async function operateAnalyticsContent(action) {
+  const account = String(action.account || "");
+  const days = action.days;
+  const custom = validDateRange(action.from_date, action.to_date);
+  if (!/^[A-Za-z0-9_]{1,15}$/.test(account) ||
+      !(DAYS.has(days) || (days === 0 && custom)))
+    return { state: "invalid_request" };
+  const range = custom ? `from=${action.from_date}&to=${action.to_date}` : `days=${days}`;
+  const path = "/i/account_analytics/content";
+  const url = `https://x.com${path}?type=posts&sort=impressions&dir=desc&${range}`;
+  return captureAnalytics(account, url, path, (record) =>
+    record.query_kind === "content" &&
+    (custom ? queryMatchesDates(record, action.from_date, action.to_date)
+            : queryMatchesDays(record, days)) &&
+    Array.isArray(record.payload?.data?.viewer_v2?.user_results?.result?.tweets_results));
+}
+
+export async function operateAnalyticsOverview(action) {
+  const account = String(action.account || "");
+  if (!/^[A-Za-z0-9_]{1,15}$/.test(account) || action.days !== 28)
+    return { state: "invalid_request" };
+  const path = "/i/account_analytics/overview";
+  return captureAnalytics(account, `https://x.com${path}`, path, (record) => {
+    const root = record.payload?.data?.viewer_v2?.user_results?.result;
+    return record.query_kind === "overview" && queryMatchesOverview(record) &&
+      Array.isArray(root?.current_time_series) && Array.isArray(root?.previous_totals);
+  });
 }

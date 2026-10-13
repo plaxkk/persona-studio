@@ -1,4 +1,4 @@
-export const EXTENSION_VERSION = "1.3.12";
+export const EXTENSION_VERSION = "1.3.13";
 export const EXTENSION_DOWNLOAD = "/downloads/persona-studio-browser.zip";
 export function extensionNeedsUpdate(version?: string) {
   if (!version || !/^\d+\.\d+\.\d+$/.test(version)) return true;
@@ -17,6 +17,7 @@ export function isUpgradeRelatedRoute(path: string) {
     || /^\/interactions(?:\/|$)/.test(path)
     || /^\/growth(?:\/|$)/.test(path)
     || /^\/analytics\/content(?:\/|$)/.test(path)
+    || /^\/analytics\/overview(?:\/|$)/.test(path)
     || /^\/drafts\/[a-f0-9-]+\/metrics(?:\/|$)/.test(path)
   );
 }

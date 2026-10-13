@@ -222,3 +222,28 @@ def test_backfill_windows_are_contiguous_and_bounded():
     assert backfill_windows("2026-06-01", "2026-07-15") == [
         ("2026-06-01", "2026-06-28"), ("2026-06-29", "2026-07-15")]
     assert backfill_windows("2026-02-30", "2026-03-01") is None
+
+
+def test_overview_response_enters_local_store(tmp_path):
+    store = create_app(tmp_path, "http://testserver").state.store
+    now = int(time.time())
+    end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    start = end - timedelta(days=28)
+    with store.db(True) as db:
+        db.execute("INSERT INTO persona_browser_presence VALUES(1,'1.3.13',?)", (now,))
+        db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,'running',?,?,?)",
+                   ("c" * 32, "analytics_overview", '{"days":28}', now, now, now))
+        db.execute("INSERT INTO analytics_browser_reads(task_id,account,days,status,updated,kind) VALUES(?,?,28,'queued',?,'overview')",
+                   ("c" * 32, "kkplayit", now))
+    reader = AnalyticsBrowserReads(store)
+    action = reader.next_action()
+    assert action["kind"] == "analytics_overview_read"
+    record = {"query_kind": "overview", "from_time": start.isoformat(), "to_time": end.isoformat(),
+              "prev_from": (start - timedelta(days=28)).isoformat(), "prev_to": start.isoformat(),
+              "observed_at": now, "payload": {"data": {"viewer_v2": {"user_results": {"result": {
+                  "current_time_series": [], "hourly_backfill": [], "previous_totals": [],
+                  "legacy_current_follow_metrics": [], "legacy_previous_follow_metrics": [],
+                  "relationship_counts": {"followers": 501}}}}}}}
+    reader.receive(action["id"], {"state": "ready", "account": "kkplayit", "record": record})
+    assert store.rows("SELECT status FROM analytics_browser_reads")[0]["status"] == "done"
+    assert store.rows("SELECT id FROM analytics_overview_runs")[0]["id"] == "c" * 32

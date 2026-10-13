@@ -138,7 +138,7 @@ async def main():
                 await expect(
                     web.get_by_text("已连接这台电脑", exact=True)
                 ).to_be_visible(timeout=15000)
-                await expect(web.get_by_role("link", name="下载连接助手 v1.3.12")).to_be_visible()
+                await expect(web.get_by_role("link", name="下载连接助手 v1.3.13")).to_be_visible()
                 await web.get_by_role("button", name="安装 / 更新指南", exact=True).click()
                 await expect(web.get_by_role("region", name="连接助手安装与更新")).to_be_visible()
                 await web.get_by_role("button", name="关闭更新指南").click()

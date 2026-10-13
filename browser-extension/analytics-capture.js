@@ -1,8 +1,10 @@
-// Runs in X's MAIN world before its app starts. It retains only Content
+// Runs in X's MAIN world before its app starts. It retains only Analytics
 // business responses, never cookies, request headers or authorization data.
 (() => {
+  const pageKind = location.pathname === "/i/account_analytics/content" ? "content" :
+    location.pathname === "/i/account_analytics/overview" ? "overview" : null;
   if (location.origin !== "https://x.com" ||
-      location.pathname !== "/i/account_analytics/content" ||
+      !pageKind ||
       window.__personaStudioTakeAnalytics) return;
 
   const pending = [];
@@ -21,30 +23,43 @@
   });
 
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this.__personaStudioContentUrl = null;
+    this.__personaStudioAnalyticsQuery = null;
     try {
       const target = new URL(String(url), location.href);
       if (["GET", "POST"].includes(String(method).toUpperCase()) &&
           target.origin === location.origin &&
-          /^\/i\/api\/graphql\/[^/]+\/contentPageQuery$/.test(target.pathname)) {
+          /^\/i\/api\/graphql\/[^/]+\/(contentPageQuery|accountOverviewDailyQuery)$/.test(target.pathname)) {
+        const queryKind = target.pathname.endsWith("/contentPageQuery") ? "content" : "overview";
+        if (queryKind !== pageKind) return originalOpen.call(this, method, url, ...rest);
         const variables = JSON.parse(target.searchParams.get("variables") || "{}");
-        if (variables && typeof variables === "object" &&
+        if (pageKind === "content" && variables && typeof variables === "object" &&
             variables.from_time != null && variables.to_time != null &&
             Number.isInteger(variables.max_results) &&
             variables.max_results >= 1 && variables.max_results <= 10_000) {
-          this.__personaStudioContentUrl = {
+          this.__personaStudioAnalyticsQuery = {
+            query_kind: "content",
             from_time: String(variables.from_time),
             to_time: String(variables.to_time),
             max_results: variables.max_results,
           };
+        } else if (pageKind === "overview" && variables && typeof variables === "object" &&
+                   ["current_from_iso", "current_to_iso", "prev_from_iso", "prev_to_iso"]
+                     .every((key) => typeof variables[key] === "string")) {
+          this.__personaStudioAnalyticsQuery = {
+            query_kind: "overview",
+            from_time: variables.current_from_iso,
+            to_time: variables.current_to_iso,
+            prev_from: variables.prev_from_iso,
+            prev_to: variables.prev_to_iso,
+          };
         }
       }
-    } catch { /* Other X requests are outside the Content collector. */ }
+    } catch { /* Other X requests are outside the Analytics collector. */ }
     return originalOpen.call(this, method, url, ...rest);
   };
 
   XMLHttpRequest.prototype.send = function (...args) {
-    const query = this.__personaStudioContentUrl;
+    const query = this.__personaStudioAnalyticsQuery;
     if (query) this.addEventListener("loadend", () => {
       if (this.status !== 200) return;
       try {

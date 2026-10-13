@@ -124,7 +124,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content") else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -241,6 +241,22 @@ class Jobs:
                             now - last['created'] >= interval):
                 try:
                     self.enqueue('analytics_content', {'days': 28},
+                                 automatic=True, dedupe=key)
+                except JobError:
+                    pass
+        if browser.connected(13):
+            key = 'analytics-overview-28'
+            latest = self.store.rows(
+                "SELECT status,error,created FROM tasks WHERE dedupe=? "
+                "ORDER BY created DESC,id DESC LIMIT 1", (key,))
+            last = latest[0] if latest else None
+            transient = {'source_error', 'browser_offline', 'timeout'}
+            interval = (3600 if last and last['status'] == 'failed' and
+                        last['error'] in transient else 86400)
+            if not last or (last['status'] not in ('queued', 'running') and
+                            now - last['created'] >= interval):
+                try:
+                    self.enqueue('analytics_overview', {'days': 28},
                                  automatic=True, dedupe=key)
                 except JobError:
                     pass
@@ -626,7 +642,7 @@ class Jobs:
                 BrowserReads(self.store).enrich(job, self.alive) if job["kind"] == "context" else
                 BrowserReads(self.store).metric(job, self.alive) if job["kind"] == "metric" else
                 BrowserReads(self.store).profile(job, self.alive) if job["kind"] == "profile_metric" else
-                AnalyticsBrowserReads(self.store).read(job, self.alive) if job["kind"] == "analytics_content" else
+                AnalyticsBrowserReads(self.store).read(job, self.alive) if job["kind"] in ("analytics_content", "analytics_overview") else
                 self.generate(job)
             )
             self.finish(job, "succeeded", result)

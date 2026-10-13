@@ -4,10 +4,41 @@ import httpx
 from fastapi.testclient import TestClient
 
 from studio.analytics_store import record_content_page
+from studio.analytics_overview_store import record_overview
 from studio.api import create_app
 from studio.desktop import desktop_route
 from studio.store import Store
-from studio.supabase_analytics import sync_one_content_run
+from studio.supabase_analytics import sync_one_content_run, sync_one_overview_run
+
+
+def test_overview_delivery_retries_points_and_keeps_series_separate(tmp_path):
+    store = Store(tmp_path)
+    record_overview(store, run_id="overview-run-x", account="owner",
+                    payload={"data": {"viewer_v2": {"user_results": {"result": {
+                        "current_time_series": [{"timestamp": 1791763200000,
+                                                 "engagement_type": "Displayed", "count": 3}],
+                        "hourly_backfill": [{"timestamp": 1791763200000,
+                                             "engagement_type": "Displayed", "count": 2}],
+                        "previous_totals": [], "legacy_current_follow_metrics": [],
+                        "legacy_previous_follow_metrics": [],
+                        "relationship_counts": {"followers": 501},
+                    }}}}}, from_time="2026-09-16T00:00:00Z",
+                    to_time="2026-10-14T00:00:00Z",
+                    prev_from="2026-08-19T00:00:00Z",
+                    prev_to="2026-09-16T00:00:00Z", observed_at=1000)
+    env = {"SUPABASE_URL": "https://example.supabase.co",
+           "SUPABASE_SECRET_KEY": "sb_secret_test_key_only_in_local_process"}
+    seen = []
+    def respond(request):
+        seen.append((request.url.path, json.loads(request.content)))
+        return httpx.Response(503 if len(seen) == 2 else 204)
+    with httpx.Client(transport=httpx.MockTransport(respond)) as client:
+        assert sync_one_overview_run(store, environ=env, client=client, now=1000)["status"] == "retry"
+        assert sync_one_overview_run(store, environ=env, client=client, now=1030)["status"] == "synced"
+    assert len(seen) == 4
+    assert [point["series"] for point in seen[3][1]] == ["current_time_series", "hourly_backfill"]
+    assert [point["count"] for point in seen[3][1]] == [3, 2]
+    assert store.rows("SELECT cloud_status FROM analytics_overview_runs")[0]["cloud_status"] == "synced"
 
 
 def test_supabase_delivery_retries_partial_write_without_duplicate_rows(tmp_path):

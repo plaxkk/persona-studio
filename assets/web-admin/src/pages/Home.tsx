@@ -19,6 +19,14 @@ type AnalyticsContent = {
     at_request_limit: number; cloud_status: string }[];
   tasks: { id: string; status: string; created: number; error: string }[];
 };
+type AnalyticsOverview = {
+  browser_ready: boolean;
+  runs: { id: string; window_from: string; window_to: string; observed_at: number;
+    point_count: number; gap_count: number; cloud_status: string;
+    scalars: { followers: number | null; verified_followers: number | null;
+      active_followers: number | null; active_followers_approximate: boolean | null } }[];
+  tasks: { id: string; status: string; error: string }[];
+};
 export default function Home({
   data,
   actions,
@@ -30,12 +38,14 @@ export default function Home({
     s = o.settings;
   const [growth, setGrowth] = useState<Growth | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsContent | null>(null);
+  const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverview | null>(null);
   const [historyFrom, setHistoryFrom] = useState("");
   const [historyTo, setHistoryTo] = useState("");
   const [target, setTarget] = useState(1000);
   useEffect(() => {
     api<Growth>("/growth").then((value) => { setGrowth(value); setTarget(value.goal?.target_followers || 1000); }).catch(() => setGrowth(null));
     api<AnalyticsContent>("/analytics/content").then(setAnalytics).catch(() => setAnalytics(null));
+    api<AnalyticsOverview>("/analytics/overview").then(setAnalyticsOverview).catch(() => setAnalyticsOverview(null));
   }, [s.x_username, o.events[0]?.id]);
   const engine = o.engines.find((e) => e.id === s.engine);
   const complete =
@@ -135,6 +145,16 @@ export default function Home({
         {analytics?.tasks.length ? <small>最近任务：{analytics.tasks.filter((task) => task.status === "queued").length} 个排队、{analytics.tasks.filter((task) => task.status === "running").length} 个读取中、{analytics.tasks.filter((task) => task.status === "succeeded").length} 个完成、{analytics.tasks.filter((task) => task.status === "failed").length} 个失败（最近 {analytics.tasks.length} 项）。</small> : null}
         {analytics?.tasks[0] && <p>最近任务：{label(analytics.tasks[0].status)}{analytics.tasks[0].error ? ` · ${label(analytics.tasks[0].error)}` : ""}。</p>}
         {analytics?.runs[0] ? <p>最近实际读取：{time(analytics.runs[0].observed_at)}，查询窗口 {analytics.runs[0].window_from} 至 {analytics.runs[0].window_to}；返回 {analytics.runs[0].received_count} 项，可解析 {analytics.runs[0].parsed_count} 项，缺口 {analytics.runs[0].gap_count} 项{analytics.runs[0].at_request_limit ? "；已达到单次查询上限，需进一步拆分" : ""}。云端状态：{label(analytics.runs[0].cloud_status)}。</p> : <p>暂无读取记录。</p>}
+      </section>
+      <section className="surface spaced">
+        <div className="section-title"><h2>Subscription 账号趋势</h2><Badge>{analyticsOverview?.browser_ready ? "可读取" : "等连接助手更新"}</Badge></div>
+        <p>读取 Overview 最近 4 周和上一期的原始趋势。小时回填与每日趋势可能重叠；卡片总量核对前，这里不把它们相加。</p>
+        <div className="draft-tools">
+          <Button disabled={!analyticsOverview?.browser_ready} onClick={() => void actions.run(() => api("/analytics/overview/read", "POST", {}), "已加入 Overview 读取队列")}>读取最近 4 周趋势</Button>
+          {!analyticsOverview?.browser_ready && <small>需要连接助手 1.3.13。</small>}
+        </div>
+        {analyticsOverview?.tasks[0] && <p>最近任务：{label(analyticsOverview.tasks[0].status)}{analyticsOverview.tasks[0].error ? ` · ${label(analyticsOverview.tasks[0].error)}` : ""}。</p>}
+        {analyticsOverview?.runs[0] ? <p>最近读取：{time(analyticsOverview.runs[0].observed_at)}，查询窗口 {analyticsOverview.runs[0].window_from} 至 {analyticsOverview.runs[0].window_to}；保留 {analyticsOverview.runs[0].point_count} 个分项，缺口 {analyticsOverview.runs[0].gap_count} 个。当前粉丝数：{analyticsOverview.runs[0].scalars.followers ?? "暂无数据"}；已认证粉丝：{analyticsOverview.runs[0].scalars.verified_followers ?? "暂无数据"}；活跃粉丝：{analyticsOverview.runs[0].scalars.active_followers == null ? "暂无数据" : `${analyticsOverview.runs[0].scalars.active_followers}${analyticsOverview.runs[0].scalars.active_followers_approximate ? "（约）" : ""}`}。云端状态：{label(analyticsOverview.runs[0].cloud_status)}。</p> : <p>暂无读取记录。</p>}
       </section>
       <div className="home-grid">
         <section className="surface">

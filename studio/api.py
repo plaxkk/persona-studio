@@ -768,8 +768,15 @@ def create_app(state_dir=None, public_url=None):
     def connections():
         cloud_counts = {row["cloud_status"]: row["n"] for row in store.rows(
             "SELECT cloud_status,count(*) AS n FROM analytics_runs GROUP BY cloud_status")}
+        for row in store.rows(
+                "SELECT cloud_status,count(*) AS n FROM analytics_overview_runs GROUP BY cloud_status"):
+            cloud_counts[row["cloud_status"]] = cloud_counts.get(row["cloud_status"], 0) + row["n"]
         cloud_error = store.rows("SELECT cloud_error FROM analytics_runs WHERE cloud_status='retry' "
                                  "ORDER BY observed_at DESC LIMIT 1")
+        if not cloud_error:
+            cloud_error = store.rows(
+                "SELECT cloud_error FROM analytics_overview_runs WHERE cloud_status='retry' "
+                "ORDER BY observed_at DESC LIMIT 1")
         return {
             "x": {
                 "username": store.get("x_username"),
@@ -849,6 +856,31 @@ def create_app(state_dir=None, public_url=None):
                 dedupe=key, available=now + len(queued) * 300))
         return {"task_ids": queued, "queued": len(queued), "skipped_succeeded": skipped,
                 "windows": len(windows)}
+
+    @app.get("/api/v1/analytics/overview", dependencies=[Depends(session)])
+    def analytics_overview():
+        from .browser_reads import BrowserReads
+        runs = store.rows(
+            "SELECT id,account,window_from,window_to,previous_from,previous_to,"
+            "observed_at,point_count,gap_count,scalars_json,cloud_status,"
+            "cloud_synced_at FROM analytics_overview_runs "
+            "ORDER BY observed_at DESC,id DESC LIMIT 20")
+        for run in runs:
+            run["scalars"] = json.loads(run.pop("scalars_json"))
+        return {"browser_ready": BrowserReads(store).connected(13),
+                "runs": runs,
+                "tasks": store.rows(
+                    "SELECT id,status,created,updated,error FROM tasks "
+                    "WHERE kind='analytics_overview' ORDER BY created DESC,id DESC LIMIT 20")}
+
+    @app.post("/api/v1/analytics/overview/read", dependencies=[Depends(session)])
+    def read_analytics_overview():
+        from .browser_reads import BrowserReads
+        if not BrowserReads(store).connected(13):
+            fail("连接助手需要更新至 1.3.13，才能读取 Overview 原始趋势。", 409)
+        return {"task_id": jobs.enqueue(
+            "analytics_overview", {"days": 28},
+            dedupe="analytics-overview-28")}
 
     @app.put("/api/v1/connections/supabase", dependencies=[Depends(session)])
     def connect_supabase(body: SupabaseConfig):

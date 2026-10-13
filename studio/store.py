@@ -243,6 +243,35 @@ class Store:
                 c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN from_date TEXT")
                 c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN to_date TEXT")
                 c.execute("INSERT INTO migrations VALUES(7,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=8").fetchone():
+                c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN kind TEXT NOT NULL DEFAULT 'content'")
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS analytics_overview_runs(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL,
+                    window_from TEXT NOT NULL, window_to TEXT NOT NULL,
+                    previous_from TEXT NOT NULL, previous_to TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL, point_count INTEGER NOT NULL,
+                    gap_count INTEGER NOT NULL, parser_version INTEGER NOT NULL,
+                    scalars_json TEXT NOT NULL, raw_json TEXT NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS analytics_overview_pending
+                    ON analytics_overview_runs(cloud_status,cloud_retry_at,observed_at);
+                CREATE TABLE IF NOT EXISTS analytics_overview_points(
+                    run_id TEXT NOT NULL REFERENCES analytics_overview_runs(id),
+                    series TEXT NOT NULL, item_index INTEGER NOT NULL,
+                    metric_index INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+                    metric_type TEXT NOT NULL, count REAL, verified INTEGER,
+                    PRIMARY KEY(run_id,series,item_index,metric_index));
+                CREATE TABLE IF NOT EXISTS analytics_overview_gaps(
+                    run_id TEXT NOT NULL REFERENCES analytics_overview_runs(id),
+                    series TEXT NOT NULL, item_index INTEGER NOT NULL,
+                    metric_index INTEGER NOT NULL, reason TEXT NOT NULL,
+                    PRIMARY KEY(run_id,series,item_index,metric_index,reason));
+                """)
+                c.execute("INSERT INTO migrations VALUES(8,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

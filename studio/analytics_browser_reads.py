@@ -7,6 +7,7 @@ import re
 import time
 
 from .analytics_store import record_content_page
+from .analytics_overview_store import record_overview
 from .browser_reads import BrowserReads
 from .subscription_analytics import AnalyticsShapeError
 from .xreader import ReadError
@@ -80,6 +81,22 @@ def _matches_window(record, days, now, from_date=None, to_date=None):
             isinstance(record.get("payload"), dict))
 
 
+def _matches_overview_window(record, now):
+    if not isinstance(record, dict) or record.get("query_kind") != "overview":
+        return False
+    start, end = _seconds(record.get("from_time")), _seconds(record.get("to_time"))
+    previous_start = _seconds(record.get("prev_from"))
+    previous_end = _seconds(record.get("prev_to"))
+    if any(value is None for value in (start, end, previous_start, previous_end)):
+        return False
+    return (26 <= (end - start) / 86400 <= 30 and
+            26 <= (previous_end - previous_start) / 86400 <= 30 and
+            abs(previous_end - start) < 60 and
+            type(record.get("observed_at")) is int and
+            abs(now - record["observed_at"]) <= 600 and
+            isinstance(record.get("payload"), dict))
+
+
 class AnalyticsBrowserReads:
     def __init__(self, store):
         self.store = store
@@ -89,20 +106,23 @@ class AnalyticsBrowserReads:
         if not browser.connected(11):
             return None
         custom_ready = browser.connected(12)
+        overview_ready = browser.connected(13)
         with self.store.db(True) as db:
             row = db.execute(
                 "SELECT b.* FROM analytics_browser_reads b JOIN tasks t ON t.id=b.task_id "
                 "WHERE b.status='queued' AND b.updated<=? AND t.status='running' "
                 "AND t.cancel=0 AND (b.days!=0 OR ?) "
+                "AND (b.kind!='overview' OR ?) "
                 "ORDER BY b.updated,b.task_id LIMIT 1",
-                (int(time.time()), int(custom_ready)),
+                (int(time.time()), int(custom_ready), int(overview_ready)),
             ).fetchone()
             if not row:
                 return None
             db.execute("UPDATE analytics_browser_reads SET status='sent',updated=? "
                        "WHERE task_id=?", (int(time.time()), row["task_id"]))
             return {"id": "analytics:" + row["task_id"],
-                    "kind": "analytics_content_read", "transport": "analytics",
+                    "kind": ("analytics_overview_read" if row["kind"] == "overview"
+                             else "analytics_content_read"), "transport": "analytics",
                     "account": row["account"], "days": row["days"],
                     "from_date": row["from_date"], "to_date": row["to_date"]}
 
@@ -123,31 +143,60 @@ class AnalyticsBrowserReads:
         if state == "ready":
             if str(data.get("account", "")).lower() != row["account"].lower():
                 state = "account_mismatch"
-            elif not _matches_window(data.get("record"), row["days"], now,
-                                     row["from_date"], row["to_date"]):
+            elif not ((_matches_overview_window(data.get("record"), now)
+                       if row["kind"] == "overview" else
+                       _matches_window(data.get("record"), row["days"], now,
+                                       row["from_date"], row["to_date"]))):
                 state = "source_error"
             else:
                 record = data["record"]
                 try:
-                    existing = self.store.rows(
-                        "SELECT account,window_from,window_to,request_limit,"
-                        "received_count,parsed_count,gap_count,at_request_limit "
-                        "FROM analytics_runs WHERE id=?", (task_id,))
-                    if existing and (existing[0]["account"].lower() != row["account"].lower() or
-                                     existing[0]["window_from"] != record["from_time"] or
-                                     existing[0]["window_to"] != record["to_time"] or
-                                     existing[0]["request_limit"] != record["max_results"]):
-                        raise AnalyticsShapeError("run_query_conflict")
-                    summary = (dict(existing[0], run_id=task_id) if existing else
-                               record_content_page(
-                                   self.store, run_id=task_id, account=row["account"],
-                                   payload=record["payload"],
-                                   from_time=record["from_time"],
-                                   to_time=record["to_time"],
-                                   max_results=record["max_results"],
-                                   observed_at=record["observed_at"]))
-                    for field in ("account", "window_from", "window_to", "request_limit"):
-                        summary.pop(field, None)
+                    if row["kind"] == "overview":
+                        existing = self.store.rows(
+                            "SELECT account,window_from,window_to,previous_from,previous_to,"
+                            "point_count,gap_count,scalars_json FROM analytics_overview_runs "
+                            "WHERE id=?", (task_id,))
+                        if existing:
+                            old = existing[0]
+                            if (old["account"].lower() != row["account"].lower() or
+                                    old["window_from"] != record["from_time"] or
+                                    old["window_to"] != record["to_time"] or
+                                    old["previous_from"] != record["prev_from"] or
+                                    old["previous_to"] != record["prev_to"]):
+                                raise AnalyticsShapeError("run_query_conflict")
+                            summary = {"run_id": task_id,
+                                       "point_count": old["point_count"],
+                                       "gap_count": old["gap_count"],
+                                       "scalars": json.loads(old["scalars_json"])}
+                        else:
+                            summary = record_overview(
+                                self.store, run_id=task_id, account=row["account"],
+                                payload=record["payload"],
+                                from_time=record["from_time"],
+                                to_time=record["to_time"],
+                                prev_from=record["prev_from"],
+                                prev_to=record["prev_to"],
+                                observed_at=record["observed_at"])
+                    else:
+                        existing = self.store.rows(
+                            "SELECT account,window_from,window_to,request_limit,"
+                            "received_count,parsed_count,gap_count,at_request_limit "
+                            "FROM analytics_runs WHERE id=?", (task_id,))
+                        if existing and (existing[0]["account"].lower() != row["account"].lower() or
+                                         existing[0]["window_from"] != record["from_time"] or
+                                         existing[0]["window_to"] != record["to_time"] or
+                                         existing[0]["request_limit"] != record["max_results"]):
+                            raise AnalyticsShapeError("run_query_conflict")
+                        summary = (dict(existing[0], run_id=task_id) if existing else
+                                   record_content_page(
+                                       self.store, run_id=task_id, account=row["account"],
+                                       payload=record["payload"],
+                                       from_time=record["from_time"],
+                                       to_time=record["to_time"],
+                                       max_results=record["max_results"],
+                                       observed_at=record["observed_at"]))
+                        for field in ("account", "window_from", "window_to", "request_limit"):
+                            summary.pop(field, None)
                 except (AnalyticsShapeError, KeyError, TypeError, ValueError):
                     state = "source_error"
         with self.store.db(True) as db:
@@ -166,14 +215,15 @@ class AnalyticsBrowserReads:
                        "WHERE task_id=?", (status, json.dumps(outcome), available, task_id))
 
     async def read(self, job, alive):
-        if not BrowserReads(self.store).connected(11):
+        overview = job["kind"] == "analytics_overview"
+        if not BrowserReads(self.store).connected(13 if overview else 11):
             raise ReadError("browser_offline")
-        days = job["payload"].get("days", 0)
+        days = 28 if overview else job["payload"].get("days", 0)
         from_date = job["payload"].get("from_date")
         to_date = job["payload"].get("to_date")
         account = self.store.get("x_username", "")
         custom = valid_date_range(from_date, to_date)
-        if (not (days in CONTENT_DAYS or (days == 0 and custom)) or
+        if (not (overview or days in CONTENT_DAYS or (days == 0 and custom)) or
                 not re.fullmatch(r"[A-Za-z0-9_]{1,15}", account)):
             raise ReadError("source_error")
         if custom and not BrowserReads(self.store).connected(12):
@@ -181,9 +231,10 @@ class AnalyticsBrowserReads:
         now = int(time.time())
         with self.store.db(True) as db:
             db.execute("INSERT OR IGNORE INTO analytics_browser_reads"
-                       "(task_id,account,days,status,updated,from_date,to_date) "
-                       "VALUES(?,?,?,'queued',?,?,?)",
-                       (job["id"], account, days, now, from_date, to_date))
+                       "(task_id,account,days,status,updated,from_date,to_date,kind) "
+                       "VALUES(?,?,?,'queued',?,?,?,?)",
+                       (job["id"], account, days, now, from_date, to_date,
+                        "overview" if overview else "content"))
             db.execute("UPDATE analytics_browser_reads SET status='queued' "
                        "WHERE task_id=? AND status='sent'", (job["id"],))
         deadline = time.monotonic() + 180
@@ -198,7 +249,7 @@ class AnalyticsBrowserReads:
                     return result["summary"]
                 raise ReadError(result.get("state") if result.get("state") in
                                 ("waiting_login", "account_mismatch") else "source_error")
-            if not BrowserReads(self.store).connected(12 if custom else 11):
+            if not BrowserReads(self.store).connected(13 if overview else 12 if custom else 11):
                 raise ReadError("browser_offline")
             await asyncio.sleep(1)
         raise ReadError("timeout")
