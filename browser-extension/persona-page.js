@@ -70,13 +70,18 @@ export async function readPersonaPage(action, expected) {
     const preface = article.innerText.split(main.text)[0] || "";
     const parentNeeded = /Replying to|回复\s?@|回复给|正在回复/.test(preface);
     const parent = parentNeeded && index > 0 ? extract(articles[index - 1]) : null;
-    const media = [...article.querySelectorAll('[data-testid="tweetPhoto"] img, video')]
-      .filter((node) => !node.closest('[data-testid="quoteTweet"]'))
-      .map((node) => ({ kind: node.tagName.toLowerCase(),
-        description: (node.getAttribute("alt") || node.getAttribute("aria-label") || "").slice(0, 500) }));
+    const targetAuthor = preface.match(/(?:Replying to|回复\s?给?|正在回复)\s*@([A-Za-z0-9_]+)/i)?.[1];
+    const verifiedParent = parent && (!targetAuthor || parent.author.toLowerCase() === targetAuthor.toLowerCase()) ? parent : null;
+    function mediaFor(node, source) {
+      return [...node.querySelectorAll('[data-testid="tweetPhoto"] img, video')]
+        .map((element) => ({ kind: element.tagName.toLowerCase(), source,
+          description: (element.getAttribute("alt") || element.getAttribute("aria-label") || "").slice(0, 500) }));
+    }
+    const media = [...mediaFor(article, "original"),
+      ...(verifiedParent && index > 0 ? mediaFor(articles[index - 1], "parent") : [])];
     return { state: "ready", account, post_id: action.post_id, author: action.author,
       record: { ...main, created_at: article.querySelector("time")?.dateTime || "",
-        parent_needed: parentNeeded, parent: parent?.text ? parent : null,
+        parent_needed: parentNeeded, parent: verifiedParent?.text ? verifiedParent : null,
         quote_needed: !!quoteNode, quote: quote?.text ? quote : null,
         media, media_pending: media.length > 0,
         truncated: !!article.querySelector('[data-testid="tweet-text-show-more-link"]'),

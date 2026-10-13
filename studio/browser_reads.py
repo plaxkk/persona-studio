@@ -123,7 +123,7 @@ class BrowserReads:
                                         'text': sanitize(str(item.get('text',''))[:6000]),
                                         'url': f"https://x.com/{item['author']}/status/{item['id']}"}
                 context['browser_context'] = sanitize(str(record.get('browser_context',''))[:2000])
-                context['media'] = [{'kind': str(m.get('kind',''))[:20], 'description': sanitize(str(m.get('description',''))[:500])}
+                context['media'] = [{'kind': str(m.get('kind',''))[:20], 'source': str(m.get('source',''))[:20], 'description': sanitize(str(m.get('description',''))[:500])}
                                     for m in record.get('media', [])[:8] if isinstance(m, dict)]
                 context['detail_checked'] = True
                 try: published=int(datetime.fromisoformat(str(record.get('created_at','')).replace('Z','+00:00')).timestamp())

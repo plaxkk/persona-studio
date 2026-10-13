@@ -99,7 +99,7 @@ export type Post = {
     source?: string;
     published_at?: number | null;
     manual_context_note?: string;
-    media?: { kind: string; description: string }[];
+    media?: { kind: string; source?: string; description: string }[];
     truncated?: boolean;
     media_pending?: boolean;
   };
