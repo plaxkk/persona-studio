@@ -6,9 +6,11 @@ import {
   RefreshCw,
   PenLine,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api, label, time } from "../api";
 import type { Studio, Actions } from "../types";
 import { Heading, Button, Badge, Step, Empty } from "../components/UI";
+type Growth = { goal: { target_followers: number } | null; profile: { followers: number | null; observed_at: number; bio: string | null; pinned_tweet_id: string | null } | null; remaining: number | null };
 export default function Home({
   data,
   actions,
@@ -18,6 +20,11 @@ export default function Home({
 }) {
   const o = data.overview,
     s = o.settings;
+  const [growth, setGrowth] = useState<Growth | null>(null);
+  const [target, setTarget] = useState(1000);
+  useEffect(() => {
+    api<Growth>("/growth").then((value) => { setGrowth(value); setTarget(value.goal?.target_followers || 1000); }).catch(() => setGrowth(null));
+  }, [s.x_username, o.events[0]?.id]);
   const engine = o.engines.find((e) => e.id === s.engine);
   const complete =
     o.persona.name !== "未命名的角色" &&
@@ -88,6 +95,16 @@ export default function Home({
           <small>由你确认，未经平台验证</small>
         </button>
       </div>
+      <section className="surface spaced">
+        <div className="section-title"><h2>涨粉目标</h2><Badge>{growth?.profile?.followers == null ? "粉丝数待读取" : `${growth.profile.followers} 位粉丝`}</Badge></div>
+        <p>最近一次账号读取：{growth?.profile ? time(growth.profile.observed_at) : "暂无数据"}。目标剩余：{growth?.remaining ?? "暂无数据"}。</p>
+        <div className="draft-tools">
+          <label>目标粉丝数 <input type="number" min="1" max="100000000" value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>
+          <Button onClick={() => void actions.run(async () => { const value = await api<Growth>("/growth/goal", "PUT", { target_followers: target }); setGrowth(value); return value; }, "涨粉目标已保存")}>保存目标</Button>
+          <Button onClick={() => void actions.run(() => api("/growth/read", "POST", {}), "已加入账号读取队列")}>读取粉丝数与主页</Button>
+        </div>
+        {growth?.profile && <small>主页介绍与置顶记录在本机每日快照中；无法读到精确粉丝数时显示“暂无数据”。</small>}
+      </section>
       <div className="home-grid">
         <section className="surface">
           <div className="section-title">

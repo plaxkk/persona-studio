@@ -4,7 +4,7 @@ let socket,
   connecting = false;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function operate(action) {
-  if (action.kind === "sync_read" || action.kind === "context_read") return operateSync(action);
+  if (["sync_read", "context_read", "metric_read", "profile_read"].includes(action.kind)) return operateSync(action);
   const key = "persona-task-" + action.import_id;
   let saved = (await chrome.storage.session.get(key))[key];
   let tab;

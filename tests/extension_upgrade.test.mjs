@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.9','1.3.10','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.3.10','1.3.11','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -44,4 +44,13 @@ test('interaction paging and review are scoped to the local bridge',()=>{
  assert.equal(allowedRoute('/interactions/123/review','PUT'),true);
  assert.equal(allowedRoute('/interactions/page?url=https%3A%2F%2Fevil.example','GET'),false);
  assert.equal(allowedRoute('/interactions/123/review','GET'),false);
+});
+test('growth and publication metrics routes stay scoped to the local bridge',()=>{
+ const id='a'.repeat(32);
+ for(const [path,method] of [
+  ['/growth','GET'],['/growth/goal','PUT'],['/growth/read','POST'],
+  ['/drafts/'+id+'/metrics','GET'],['/drafts/'+id+'/metrics/read','POST']
+ ]) { assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true); }
+ assert.equal(allowedRoute('/growth/goal','GET'),false);
+ assert.equal(allowedRoute('/drafts/'+id+'/metrics/export','POST'),false);
 });

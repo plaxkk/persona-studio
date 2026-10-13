@@ -66,9 +66,10 @@ function sourceUrl(source, account) {
 
 export async function operateSync(action) {
   const account = String(action.account || "");
-  const detail = action.kind === "context_read";
+  const detail = action.kind === "context_read" || action.kind === "metric_read";
+  const profile = action.kind === "profile_read";
   if (!/^[A-Za-z0-9_]{1,15}$/.test(account) ||
-      (detail ? !/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d+$/.test(action.post_id || "") : !SOURCES.has(action.source)))
+      (detail ? !/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d+$/.test(action.post_id || "") : !profile && !SOURCES.has(action.source)))
     return { state: "invalid_request" };
   const saved = (await chrome.storage.session.get(TAB_KEY))[TAB_KEY];
   let tab;
@@ -95,10 +96,18 @@ export async function operateSync(action) {
       }
     }
     if (!opened && (await chrome.tabs.get(tab.id)).url !== url) await chrome.tabs.update(tab.id, { url });
-    result = await ready(tab.id, account, { kind: "sync_detail", author: action.author, post_id: action.post_id }, url);
+    result = await ready(tab.id, account, {
+      kind: action.kind === "metric_read" ? "metric_snapshot" : "sync_detail",
+      author: action.author, post_id: action.post_id,
+    }, url);
     if (result.state !== "ready" || result.post_id !== action.post_id || String(result.author || "").toLowerCase() !== action.author.toLowerCase())
       return { state: result.state === "ready" ? "source_error" : result.state };
     return result;
+  }
+  if (profile) {
+    const url = `https://x.com/${account}`;
+    if (tab.url !== url) await chrome.tabs.update(tab.id, { url });
+    return ready(tab.id, account, { kind: 'profile_snapshot' });
   }
   const url = sourceUrl(action.source, account);
   if (tab.url !== url) {
