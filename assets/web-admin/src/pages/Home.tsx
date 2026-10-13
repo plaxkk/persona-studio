@@ -48,6 +48,16 @@ export default function Home({
     api<AnalyticsOverview>("/analytics/overview").then(setAnalyticsOverview).catch(() => setAnalyticsOverview(null));
   }, [s.x_username, o.events[0]?.id]);
   const engine = o.engines.find((e) => e.id === s.engine);
+  async function queueOverview() {
+    const queued = await actions.run(
+      () => api<{ task_id: string }>("/analytics/overview/read", "POST", {}),
+      "已加入 Overview 读取队列",
+    );
+    if (queued) {
+      api<AnalyticsOverview>("/analytics/overview")
+        .then(setAnalyticsOverview).catch(() => setAnalyticsOverview(null));
+    }
+  }
   const complete =
     o.persona.name !== "未命名的角色" &&
     engine?.status === "ready" &&
@@ -150,7 +160,7 @@ export default function Home({
         <div className="section-title"><h2>Subscription 账号趋势</h2><Badge>{analyticsOverview?.browser_ready ? "可读取" : "等连接助手更新"}</Badge></div>
         <p>读取 Overview 最近 4 周和上一期的原始趋势。小时回填与每日趋势可能重叠；卡片总量核对前，这里不把它们相加。</p>
         <div className="draft-tools">
-          <Button disabled={!analyticsOverview?.browser_ready} onClick={() => void actions.run(() => api("/analytics/overview/read", "POST", {}), "已加入 Overview 读取队列")}>读取最近 4 周趋势</Button>
+          <Button disabled={!analyticsOverview?.browser_ready} onClick={() => void queueOverview()}>读取最近 4 周趋势</Button>
           {!analyticsOverview?.browser_ready && <small>需要连接助手 1.3.13。</small>}
         </div>
         {analyticsOverview?.tasks[0] && <p>最近任务：{label(analyticsOverview.tasks[0].status)}{analyticsOverview.tasks[0].error ? ` · ${label(analyticsOverview.tasks[0].error)}` : ""}。</p>}
