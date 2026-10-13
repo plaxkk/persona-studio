@@ -44,6 +44,9 @@ def parse_overview(payload, *, from_time, to_time, prev_from, prev_to,
         raise AnalyticsShapeError("overview_result_missing") from exc
     if not isinstance(root, dict):
         raise AnalyticsShapeError("overview_result_invalid")
+    if (not isinstance(root.get("current_time_series"), list) or
+            not isinstance(root.get("previous_totals"), list)):
+        raise AnalyticsShapeError("overview_core_series_missing")
     points, gaps = [], []
     for series in SERIES:
         items = root.get(series)

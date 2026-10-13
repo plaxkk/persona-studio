@@ -65,3 +65,11 @@ def test_overview_local_stage_is_idempotent_and_excludes_caller_headers(tmp_path
     assert run["cloud_status"] == "pending"
     with pytest.raises(AnalyticsShapeError, match="run_id_conflict"):
         record_overview(store, **{**args, "to_time": "2026-10-15T00:00:00.000Z"})
+
+
+def test_overview_rejects_error_payload_without_core_series():
+    payload = {"data": {"viewer_v2": {"user_results": {"result": {
+        "relationship_counts": {"followers": 501},
+    }}}}}
+    with pytest.raises(AnalyticsShapeError, match="overview_core_series_missing"):
+        parse_overview(payload, **WINDOW, observed_at=int(time.time()))
