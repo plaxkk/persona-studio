@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { desktopCall } from "../desktop";
 import { Button } from "./UI";
 import App from "../App";
@@ -186,6 +187,7 @@ export function DesktopGate() {
           </p>
         </main>
       )}
+      <Analytics />
     </>
   );
 }
