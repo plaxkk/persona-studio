@@ -27,13 +27,12 @@ export async function readPersonaPage(action, expected) {
   if (action.kind === "identity") return { state: "ready", account };
   if (action.kind === "sync_snapshot" && /Something went wrong|Try reloading|出了点问题|重新加载/.test(primary.innerText))
     return { state: "source_error" };
-  if (action.kind === "sync_snapshot" && primary.querySelector('[role="progressbar"]'))
-    return { state: "waiting_browser" };
   if (action.kind === "sync_snapshot" && !primary.querySelector('article[data-testid="tweet"]')) {
     // A still-loading timeline must never be reported as a successful empty read.
     const empty = primary.querySelector('[data-testid="emptyState"]');
     const emptyMessage = /No results for|No results found|No posts yet|没有找到结果|暂无帖子/.test(primary.innerText);
-    if (!empty && !emptyMessage) return { state: "waiting_browser" };
+    if (primary.querySelector('[role="progressbar"]') || (!empty && !emptyMessage))
+      return { state: "waiting_browser" };
   }
   const prior = globalThis.__personaTargets;
   if (["expand", "original", "detail"].includes(action.kind)) {

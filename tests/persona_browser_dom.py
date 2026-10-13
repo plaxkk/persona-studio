@@ -26,7 +26,14 @@ async def main():
             if choices
             else "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
         )
-        browser = await p.chromium.launch(executable_path=binary, headless=True)
+        try:
+            browser = await p.chromium.launch(executable_path=binary, headless=True)
+        except Exception:
+            # Bundled Chromium can be present but unusable on this Mac.
+            browser = await p.chromium.launch(
+                executable_path="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+                headless=True,
+            )
         page = await browser.new_page()
         await page.route(
             "https://x.com/**", lambda r: r.fulfill(body=HTML, content_type="text/html")
@@ -65,6 +72,13 @@ async def main():
         assert not expanded["records"][1]["truncated"]
         stale = await act("expand", target)
         assert "失效" in stale["snapshot"]
+        # X keeps an infinite-scroll progress bar visible even when posts are ready.
+        await page.evaluate('document.querySelector("main").insertAdjacentHTML("beforeend", \'<div role="progressbar"></div>\')')
+        ready = await page.evaluate('async () => readPersonaPage({kind:"sync_snapshot",source:"own"},"example")')
+        assert ready["state"] == "ready" and len(ready["records"]) == 4
+        await page.evaluate('document.querySelectorAll("main article").forEach(node => node.remove())')
+        loading = await page.evaluate('async () => readPersonaPage({kind:"sync_snapshot",source:"own"},"example")')
+        assert loading["state"] == "waiting_browser"
         await page.evaluate('document.querySelector("nav a").href="/other"')
         assert (await act("scroll"))["state"] == "account_mismatch"
         await page.evaluate(
