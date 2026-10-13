@@ -5,9 +5,9 @@
 | 页面 | 页面路径 | 时间范围 / 筛选 | 可见字段 | 当前可用状态 | 读取方式与待核对点 |
 | --- | --- | --- | --- | --- | --- |
 | Overview | `/i/account_analytics/overview` | 7D、2W、4W、3M、1Y；可选图表指标，支持 CSV | Impressions、Engagement rate、Engagements、Profile visits、Replies、Likes、Reposts、Bookmarks、Shares、Followers、Verified followers、Active followers；日/小时趋势 | 实际页面有值 | 已观察到 `accountOverviewDailyQuery` GraphQL 请求及 200 JSON 响应；见下方安全结构。需核对每个字段的时间窗口、总量与趋势数组。 |
-| Audience | `/i/account_analytics/audience` | 7D、28D、3M；指标可选 Likes、Impressions、Bookmarks、Shares、New follows、Replies、Reposts、Profile visits | Age、Active times、Following、Gender、Country、Device | 页面可打开；部分卡片显示 `Not enough data yet` | 页面 DOM 已核对。需逐卡片确认请求、缺数据表达、分母和时间范围；不能把缺少样本当零。 |
-| Content | `/i/account_analytics/content` | Posts、Posts and replies、Replies、Community posts；7D、2W、4W、3M；排序、CSV | 帖子列表的 Date、Impressions、Likes、Replies、Reposts；单条详情链接 | 实际列表有值 | 页面 DOM 已核对。Posts 筛选中也出现以 `@` 开头的内容，分类不能只靠过滤器；保存 X 原分类与本机推文类型两个字段。需核对分页、排序与历史覆盖范围。 |
-| Content detail | `/i/account_analytics/content/{post_id}` | 单条历史帖子；Activity Breakdown 有 Realtime Last Hour / Last 48 Hours、First 48 Hours | Impressions、Likes、Replies、Reposts、Engagement rate、Profile visits、New follows、Bookmarks、Shares、Media views；Audience Insights 中 Age、Country、Gender、Device、Following | 2026-07-27 的帖子在 2026-10-13 仍可查看详情；Media views 在所见样本为 `-` | 页面 DOM 已核对。需要按帖子 ID 读取实际请求，保存读取时间；`-` 应记为未知。单条样本只能证明该历史详情可见，不能推断全部历史可补齐。 |
+| Audience | `/i/account_analytics/audience` | 7D、28D、3M；指标可选 Likes、Impressions、Bookmarks、Shares、New follows、Replies、Reposts、Profile visits | Age、Active times、Following、Gender、Country、Device | 实际页面及 `audienceOverviewDataQuery` 有值；部分卡片显示 `Not enough data yet` | 按所选指标和时间范围保存受众分布；缺数据不可写零。热力图可能使用独立时间窗口。 |
+| Content | `/i/account_analytics/content` | Posts、Posts and replies、Replies、Community posts；7D、2W、4W、3M；排序、CSV | 帖子列表的 Date、Impressions、Likes、Replies、Reposts；单条详情链接 | 3M Posts 查询返回 828 个结果项，其中 827 个带可解析帖文和指标 | `contentPageQuery` 请求含 `max_results=1000`、`query_page_size=100`；必须记录覆盖区间、筛选条件、上限和异常项，不能据此推断全部历史均已同步。Posts 筛选中也出现以 `@` 开头的内容，分类不能只靠过滤器。 |
+| Content detail | `/i/account_analytics/content/{post_id}` | 单条历史帖子；Activity Breakdown 有 Realtime Last Hour / Last 48 Hours、First 48 Hours | Impressions、Likes、Replies、Reposts、Engagement rate、Profile visits、New follows、Bookmarks、Shares、Media views；Audience Insights 中 Age、Country、Gender、Device、Following | 2026-07-27 的帖子在 2026-10-13 仍可查看详情；所见 Media views 为 `-` | 已观察到详情、总指标、首 48 小时、最近 48 小时、实时和受众的独立请求。单条历史样本仍不足以推断全部历史可补齐；`-` 应记为未知。 |
 | Video | `/i/account_analytics/video` | 48H、7D、2W、4W、3M、1Y；CSV | Views、Watch Time (hours)、Completion Rate、Average Watch Time、Video Completion；视频列表 Date / Views | 实际页面有 2 条视频 | 页面 DOM 已核对。需核对视频字段请求与汇总/单条口径。 |
 | Live | `/i/account_analytics/live` | 页面可选筛选/排序 | 直播列表及指标 | 所见账号暂无直播 | 页面 DOM 已核对。暂无可验证的真实指标样本。 |
 | Spaces | `/i/account_analytics/spaces` | 页面可选筛选/排序 | Spaces 列表及指标 | 所见账号暂无 Space | 页面 DOM 已核对。暂无可验证的真实指标样本。 |
@@ -15,6 +15,14 @@
 ## 已观察到的请求结构
 
 Overview 页面调用 `/i/api/graphql/2hqAR3h2xhN1cUrUBZypyg/accountOverviewDailyQuery`。查询变量的**键名**是 `current_from`、`current_from_iso`、`current_to`、`current_to_iso`、`prev_from`、`prev_from_iso`、`prev_to`、`prev_to_iso`、`backfill_from`、`backfill_to`、`show_realtime_active_followers`、`show_verified_followers`。只保留路径和键名，不记录真实请求值或鉴权材料。观察到的响应根路径为 `data.viewer_v2.user_results.result`，其下有 `current_time_series`、`hourly_backfill`、`legacy_current_follow_metrics`、`legacy_previous_follow_metrics`、`previous_totals`、`realtime_active_followers`、`relationship_counts`、`verified_follower_count`。
+
+`current_time_series` 每项包含 `count`、`engagement_type`、`is_engaging_user_verified`、毫秒 `timestamp`；`hourly_backfill` 包含 `count`、`engagement_type`、毫秒 `timestamp`。两者日期可能重叠，不能直接相加。所见 `engagement_type` 包括 `Displayed`、`Fav`、`Reply`、`Retweet`、`Bookmark`、`Share`、`ProfilePic`、`Follow`、`Unfollow` 等。`legacy_current_follow_metrics` 的每项是 `metric_values[{metric_type, metric_value}]` 加 `timestamp.iso8601_time`。曾将 `current_time_series` 按类别直接求和，结果与页面卡片不完全相同；卡片口径和实时回填关系尚待实测核对，不能发布该求和结果为精确总量。
+
+Content 列表调用 `contentPageQuery`，变量键为 `from_time`、`to_time`、`max_results`、`query_page_size`、`requested_metrics`。结果在 `data.viewer_v2.user_results.result.tweets_results[]`；可解析项含帖子 ID、`details.created_at_ms`、`details.full_text`、`organic_metrics_total[{metric_type,metric_value}]`。所见 13 类指标为 `Impressions`、`Likes`、`Engagements`、`Bookmark`、`Share`、`Follows`、`Replies`、`Retweets`、`ProfileVisits`、`DetailExpands`、`UrlClicks`、`HashtagClicks`、`PermalinkClicks`。记录中存在一个无 `result` 的条目，解析器须保留异常并继续，不能静默记作完整覆盖。
+
+Content detail 分别调用 `postDetailsProviderQuery`（正文与公开计数）、`postDetailsProviderMetricsTotalQuery`（11 类累计指标）、`postDetailsProviderFirst48HoursDataQuery`、`postDetailsProviderLast48HoursOrganicDataQuery`、`postDetailsProviderRealtimeDataQuery` 和 `postDetailsProviderAudienceQuery`。前两项以 `rest_id` 查询；累计指标另带 `requested_metrics`、`from_time`、`to_time`。时间序列项含 `metric_values` 与 `timestamp.iso8601_time`，某些指标只有 `metric_type` 而无 `metric_value`，应记未知而非零。详情受众项含国家或年龄、性别、设备、关系等维度及 `count`、`engagement_type`、毫秒时间戳；其分布不是粉丝画像。
+
+Audience 页面调用 `audienceOverviewDataQuery`，变量键为 `from_time_incl`、`to_time_excl`、`dimensions`、`heatmap_from_time_incl`、`heatmap_to_time_excl`、`requested_metrics`。响应包含 `organic_metrics_time_series`（指标值及 ISO 时间）、`uec_country_metrics_daily_time_series_count`（国家、行为、计数、毫秒时间）和 `uec_metrics_daily_time_series_count`（年龄、性别、设备、关注关系、行为、计数、毫秒时间）。所见 28 天 Likes 页面仅国家有可见分布，其余多个卡片显示样本不足；只有在核对筛选指标和分母后才能重建百分比。
 
 ## 实施边界
 
