@@ -67,6 +67,7 @@ ERRORS = {
     "post_missing": "原帖不存在。",
     "risk_skipped": "内容不适合自动生成，已跳过。",
     "context_incomplete": "还缺少原帖上下文，请先补全再准备回复。",
+    "context_unavailable": "原帖详情暂时无法读取，请稍后重试；现有内容仍保留待补上下文。",
     "reply_exists": "这条原帖已有一条待审回复，请继续修改现有草稿。",
     "reply_daily_limit": "今天已准备 20 条回复草稿，请先审核现有内容。",
     "reply_author_limit": "今天已为这位作者准备两条新回复，继续交流请从已有对话进入。",

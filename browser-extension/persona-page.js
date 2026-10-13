@@ -91,7 +91,7 @@ export async function readPersonaPage(action, expected) {
     if (!/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d+$/.test(action.post_id || ""))
       return { state: "invalid_request" };
     if (location.pathname.toLowerCase() !== `/${action.author.toLowerCase()}/status/${action.post_id}`)
-      return { state: "source_error" };
+      return { state: "waiting_browser" };
     const articles = [...primary.querySelectorAll('article[data-testid="tweet"]')];
     const key = `/${action.author.toLowerCase()}/status/${action.post_id}`;
     const index = articles.findIndex((article) =>

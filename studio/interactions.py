@@ -80,7 +80,9 @@ def score_post(post, skills, review=None):
         "timing": {"value": 10 if age is not None and age <= 86400 else 5 if age is not None and age <= 259200 else 0, "reason": "24 小时内" if age is not None and age <= 86400 else "72 小时内" if age is not None and age <= 259200 else "发布时间较久" if age is not None else "发布时间未知"},
     }
     # Unknown publish time must not quietly become a zero in an apparent total.
-    evidence_known = manually_supported or any(s["level"] == "practiced" and s["confirmed"] and s["evidence"].strip() for s in skills)
+    # A practiced skill on an unrelated topic cannot establish that this
+    # particular conversation has something useful we can add.
+    evidence_known = manually_supported or bool(practiced)
     total = sum(item["value"] for item in score.values()) if age is not None and evidence_known else None
     scenario = "已有读者的直接互动" if scene == "direct" else "同阶段互助" if learning else "经验交流" if practiced else "一般讨论"
     return {"context_status": status, "context_issue": issue, "topic": topic,

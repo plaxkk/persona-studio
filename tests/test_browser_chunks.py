@@ -10,6 +10,7 @@ from studio.browser_chunks import ChunkError, MAX_CHUNK_BYTES, ResultChunks
 from studio.api import create_app
 from studio.browser_identity import EXTENSION_ORIGIN
 from studio.desktop import CLOUD_ORIGIN
+from studio.desktop import desktop_route
 from studio.security import digest
 
 
@@ -91,3 +92,17 @@ def test_authenticated_bridge_accepts_complete_chunked_result(tmp_path):
                 socket.send_json(chunk)
             assert socket.receive_json()["action"] is None
     assert store.rows("SELECT status FROM browser_reads WHERE task_id='chunk-task'")[0]["status"] == "done"
+
+
+def test_publication_metrics_are_available_only_on_the_expected_device_routes():
+    ident = "a" * 32
+    for path, method in [
+        ("/growth", "GET"), ("/growth/read", "POST"),
+        ("/growth/goal", "PUT"),
+        (f"/drafts/{ident}/metrics", "GET"),
+        (f"/drafts/{ident}/metrics/read", "POST"),
+    ]:
+        assert desktop_route("/api/v1" + path, method)
+    assert not desktop_route("/api/v1/growth/goal", "GET")
+    assert not desktop_route(f"/api/v1/drafts/{ident}/metrics/read", "GET")
+    assert not desktop_route("/api/v1/connections/supabase", "PUT")

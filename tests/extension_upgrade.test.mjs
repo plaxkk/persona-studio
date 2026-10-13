@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.8','1.3.10','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.3.10','1.3.11','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);

@@ -237,7 +237,10 @@ class BrowserReads:
                 c.execute("UPDATE posts SET text=?,context=?,seen=? WHERE id=?",
                           (sanitize(str(record.get('text',''))[:10000]), json.dumps(context, ensure_ascii=False), now, row['post_id']))
                 updated += 1
-        return {'checked': updated, 'failed': failed, 'requested': len(rows)}
+        if not updated:
+            raise ReadError('context_unavailable')
+        return {'checked': updated, 'failed': failed, 'requested': len(rows),
+                'complete': failed == 0}
 
     async def sync(self, job, alive):
         if not self.connected(): raise ReadError('browser_offline')
