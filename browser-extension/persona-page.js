@@ -37,19 +37,23 @@ export async function readPersonaPage(action, expected) {
     if (!article) return { state: "waiting_browser" };
     const time = [...article.querySelectorAll('time')].find((node) =>
       !node.closest('[data-testid="quoteTweet"]') && node.closest('a')?.getAttribute('href')?.toLowerCase() === path);
-    const group = article.querySelector('[role="group"]');
+    const group = [...article.querySelectorAll('[role="group"]')].find((node) => !node.closest('[data-testid="quoteTweet"]'));
     const labels = [group?.getAttribute('aria-label') || '', ...[...article.querySelectorAll('[aria-label]')]
+      .filter((node) => !node.closest('[data-testid="quoteTweet"]'))
       .map((node) => node.getAttribute('aria-label') || '')].join(' · ');
     const count = (en, zh) => {
       const a = labels.match(new RegExp(`(?:^|[^\\d])([\\d,]+)\\s+${en}\\b`, 'i'));
-      const b = labels.match(new RegExp(`${zh}[^\\d]*([\\d,]+)`));
-      const c = labels.match(new RegExp(`([\\d,]+)\\s*${zh}`));
+      const b = labels.match(new RegExp(`${zh}\\s*([\\d,]+)(?![\\d.,万千亿KkMm])`));
+      const c = labels.match(new RegExp(`(?:^|[^\\d.])([\\d,]+)\\s*${zh}`));
       const value = (a || b || c)?.[1]?.replaceAll(',', '');
       return value && /^\d+$/.test(value) ? Number(value) : null;
     };
-    const before = article.innerText.split(article.querySelector('[data-testid="tweetText"]')?.innerText || '\uffff')[0] || '';
+    const ownText = [...article.querySelectorAll('[data-testid="tweetText"]')]
+      .find((node) => !node.closest('[data-testid="quoteTweet"]'));
+    const quoteNode = article.querySelector('[data-testid="quoteTweet"]');
+    const before = article.innerText.split(ownText?.innerText || quoteNode?.innerText || '\uffff')[0] || '';
     const kind = /Replying to|回复\s?@|回复给|正在回复/.test(before) ? 'reply' :
-      article.querySelector('[data-testid="quoteTweet"]') ? 'quote' : 'post';
+      quoteNode ? 'quote' : 'post';
     return { state: 'ready', account, post_id: action.post_id, author: action.author,
       record: { created_at: time?.dateTime || '', kind,
         views: count('views?', '次查看|次浏览|浏览'),

@@ -9,11 +9,12 @@ from playwright.async_api import async_playwright
 ROOT = Path(__file__).resolve().parents[1]
 DETAIL = '''<meta charset="utf-8"><nav><a data-testid="AppTabBar_Profile_Link" href="/owner">Me</a></nav><main>
 <article data-testid="tweet"><a href="/owner/status/123"><time datetime="2026-10-10T01:00:00Z"></time></a>
-<div data-testid="tweetText">这是我的实际发布内容</div><div data-testid="quoteTweet">被引用的内容</div>
+<div data-testid="tweetText">这是我的实际发布内容</div><div data-testid="quoteTweet">被引用的内容<div role="group" aria-label="999 Views, 40 Likes"></div></div>
 <div role="group" aria-label="3 Replies, 2 Reposts, 12 Likes, 230 Views"></div></article></main>'''
 PROFILE = '''<meta charset="utf-8"><nav><a data-testid="AppTabBar_Profile_Link" href="/owner">Me</a></nav><main>
 <div data-testid="UserDescription">写产品和代码</div><a href="/owner/followers" aria-label="987 Followers">987 Followers</a>
 <article data-testid="tweet"><div data-testid="socialContext">Pinned</div><a href="/owner/status/123"><time datetime="2026-10-10T01:00:00Z"></time></a></article></main>'''
+COMPACT = DETAIL.replace('/status/123', '/status/124').replace('3 Replies, 2 Reposts, 12 Likes, 230 Views', '1.2万 浏览')
 
 
 async def main():
@@ -26,7 +27,8 @@ async def main():
         browser = await playwright.chromium.launch(executable_path=binary, headless=True)
         page = await browser.new_page()
         await page.route('https://x.com/**', lambda route: route.fulfill(
-            body=DETAIL if '/status/' in route.request.url else PROFILE, content_type='text/html'))
+            body=COMPACT if '/status/124' in route.request.url else DETAIL if '/status/' in route.request.url else PROFILE,
+            content_type='text/html'))
         code = (ROOT / 'browser-extension/persona-page.js').read_text().replace('export async function', 'async function')
         await page.goto('https://x.com/owner/status/123')
         await page.add_script_tag(content=code + ';window.readPersonaPage=readPersonaPage;')
@@ -36,6 +38,10 @@ async def main():
         assert metric['record']['likes'] == 12, metric
         assert metric['record']['replies'] == 3, metric
         assert metric['record']['kind'] == 'quote', metric
+        await page.goto('https://x.com/owner/status/124')
+        await page.add_script_tag(content=code + ';window.readPersonaPage=readPersonaPage;')
+        compact = await page.evaluate('async () => readPersonaPage({kind:"metric_snapshot",author:"owner",post_id:"124"},"owner")')
+        assert compact['record']['views'] is None, compact
         await page.goto('https://x.com/owner')
         await page.add_script_tag(content=code + ';window.readPersonaPage=readPersonaPage;')
         profile = await page.evaluate('async () => readPersonaPage({kind:"profile_snapshot"},"owner")')
