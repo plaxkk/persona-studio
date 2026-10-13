@@ -30,6 +30,28 @@ async function ready(tabId, account, action, expectedUrl = "") {
   return { state: "waiting_browser" };
 }
 
+async function clickRoute(tabId, pathname, postOnly = false) {
+  try {
+    const result = await chrome.scripting.executeScript({
+      target: { tabId }, world: "ISOLATED",
+      func: (path, onlyPost) => {
+        const links = onlyPost
+          ? [...document.querySelectorAll('main article[data-testid="tweet"] time')]
+              .map((time) => time.closest("a"))
+          : [...document.querySelectorAll('a[href]')];
+        const link = links.find((node) => node?.getAttribute("href")?.toLowerCase() === path.toLowerCase());
+        if (!link) return false;
+        link.click();
+        return true;
+      },
+      args: [pathname, postOnly],
+    });
+    return Boolean(result[0]?.result);
+  } catch {
+    return false;
+  }
+}
+
 function sourceUrl(source, account) {
   const query = {
     mentions: `@${account} -from:${account}`,
@@ -62,7 +84,17 @@ export async function operateSync(action) {
   if (result.state !== "ready") return result;
   if (detail) {
     const url = `https://x.com/${action.author}/status/${action.post_id}`;
-    if (tab.url !== url) await chrome.tabs.update(tab.id, { url });
+    // X can leave a direct reload on its Loading placeholder even when the
+    // same post opens normally through a link in its already-loaded app.
+    let opened = await clickRoute(tab.id, new URL(url).pathname, true);
+    if (!opened) {
+      const current = await chrome.tabs.get(tab.id);
+      if (current.url !== url && new URL(current.url).pathname !== "/home" && await clickRoute(tab.id, "/home")) {
+        const home = await ready(tab.id, account, { kind: "identity" }, "https://x.com/home");
+        if (home.state === "ready") opened = await clickRoute(tab.id, new URL(url).pathname, true);
+      }
+    }
+    if (!opened && (await chrome.tabs.get(tab.id)).url !== url) await chrome.tabs.update(tab.id, { url });
     result = await ready(tab.id, account, { kind: "sync_detail", author: action.author, post_id: action.post_id }, url);
     if (result.state !== "ready" || result.post_id !== action.post_id || String(result.author || "").toLowerCase() !== action.author.toLowerCase())
       return { state: result.state === "ready" ? "source_error" : result.state };
