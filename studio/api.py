@@ -141,10 +141,16 @@ class DraftIn(Input):
 class DraftEdit(Input):
     text: str = Field(max_length=12000)
     version: int = Field(ge=1)
+    reason: str = Field(default="", max_length=1000)
 
 
 class Completion(Input):
     result_url: str = Field(default="", max_length=1000)
+    publication_kind: str = Field(default="", pattern=r"^(|post|quote|reply)$")
+
+
+class GrowthGoal(Input):
+    target_followers: int = Field(ge=1, le=100_000_000)
 
 
 class Text(Input):
@@ -1011,7 +1017,7 @@ def create_app(state_dir=None, public_url=None):
     @app.get("/api/v1/drafts", dependencies=[Depends(session)])
     def drafts():
         return store.rows(
-            "SELECT drafts.*,creations.id AS creation_id,posts.url AS source_url,posts.text AS source_text,posts.author AS source_author FROM drafts LEFT JOIN posts ON posts.id=drafts.post_id LEFT JOIN creations ON creations.draft_id=drafts.id ORDER BY drafts.updated DESC LIMIT 200"
+            "SELECT drafts.*,creations.id AS creation_id,posts.url AS source_url,posts.text AS source_text,posts.author AS source_author,p.tweet_id,p.user_confirmed_at,p.platform_observed_at,p.published_at,p.publication_kind FROM drafts LEFT JOIN posts ON posts.id=drafts.post_id LEFT JOIN creations ON creations.draft_id=drafts.id LEFT JOIN draft_publications p ON p.draft_id=drafts.id ORDER BY drafts.updated DESC LIMIT 200"
         )
 
     @app.post("/api/v1/drafts", dependencies=[Depends(session)])
@@ -1049,8 +1055,9 @@ def create_app(state_dir=None, public_url=None):
                 (text, now, draft_id),
             )
             c.execute(
-                "INSERT INTO draft_versions VALUES(?,?,?,?)",
-                (draft_id, body.version + 1, text, now),
+                "INSERT INTO draft_versions(draft_id,version,text,created,reason) VALUES(?,?,?,?,?)",
+                (draft_id, body.version + 1, text, now,
+                 sanitize(body.reason, vault.all().values())),
             )
         return store.rows("SELECT * FROM drafts WHERE id=?", (draft_id,))[0]
 
@@ -1071,18 +1078,44 @@ def create_app(state_dir=None, public_url=None):
     @app.post("/api/v1/drafts/{draft_id}/confirm", dependencies=[Depends(session)])
     def confirm(draft_id: str, body: Completion):
         url = canonical_x_url(body.result_url) if body.result_url else ""
+        match = re.fullmatch(r"https://x\.com/([A-Za-z0-9_]{1,15}|i/web)/status/(\d{1,30})", url) if url else None
+        author, tweet_id = (match.group(1), match.group(2)) if match else (None, None)
+        if author == 'i/web':
+            fail("请粘贴包含 X 用户名的帖子链接，才能读取发布结果。",422)
+        account = store.get("x_username", "")
+        if author and account and author.lower() != account.lower():
+            fail("发布链接的账号与当前连接账号不一致。", 422)
         with store.db(True) as c:
             row = c.execute(
-                "SELECT status,post_id FROM drafts WHERE id=?", (draft_id,)
+                "SELECT status,post_id,kind,result_url FROM drafts WHERE id=?", (draft_id,)
             ).fetchone()
             if not row:
                 fail("草稿不存在", 404)
             if row["status"] == "archived":
                 fail("已归档的草稿不能确认完成", 409)
+            if row['status'] == 'confirmed' and not url and row['result_url']:
+                url = row['result_url']
+                match = re.fullmatch(r"https://x\.com/([A-Za-z0-9_]{1,15})/status/(\d{1,30})", url)
+                author, tweet_id = (match.group(1),match.group(2)) if match else (None,None)
+            publication_kind = body.publication_kind or ('reply' if row['kind'] == 'reply' else 'post')
+            if row["kind"] == 'reply' and publication_kind != 'reply':
+                fail("回复草稿只能关联回复帖。", 422)
+            if row["kind"] != 'reply' and publication_kind == 'reply':
+                fail("原创草稿不能关联回复帖。", 422)
+            now = int(time.time())
             c.execute(
                 "UPDATE drafts SET status='confirmed',result_url=?,updated=? WHERE id=?",
-                (url, int(time.time()), draft_id),
+                (url, now, draft_id),
             )
+            c.execute("""INSERT INTO draft_publications(draft_id,tweet_id,url,author,user_confirmed,user_confirmed_at,publication_kind)
+                VALUES(?,?,?,?,1,?,?) ON CONFLICT(draft_id) DO UPDATE SET
+                tweet_id=excluded.tweet_id,url=excluded.url,author=excluded.author,
+                user_confirmed=1,user_confirmed_at=COALESCE(draft_publications.user_confirmed_at,excluded.user_confirmed_at),
+                platform_observed_at=CASE WHEN draft_publications.tweet_id=excluded.tweet_id THEN draft_publications.platform_observed_at ELSE NULL END,
+                published_at=CASE WHEN draft_publications.tweet_id=excluded.tweet_id THEN draft_publications.published_at ELSE NULL END,
+                observation_source=CASE WHEN draft_publications.tweet_id=excluded.tweet_id THEN draft_publications.observation_source ELSE NULL END,
+                publication_kind=excluded.publication_kind""",
+                (draft_id,tweet_id,url or None,author,now,publication_kind))
             if row["post_id"]:
                 c.execute(
                     "UPDATE posts SET status='handled' WHERE id=?", (row["post_id"],)
@@ -1091,6 +1124,57 @@ def create_app(state_dir=None, public_url=None):
                 "confirmed", "用户确认已完成（未经平台验证）", {"draft_id": draft_id}, c
             )
         return {"status": "confirmed", "verified": False}
+
+    @app.get("/api/v1/growth", dependencies=[Depends(session)])
+    def growth():
+        goal = store.rows("SELECT target_followers,created_at,updated_at FROM growth_goals WHERE id=1")
+        latest = store.rows("SELECT followers,observed_at,day,bio,pinned_tweet_id FROM profile_snapshots WHERE account=? ORDER BY observed_at DESC LIMIT 1", (store.get('x_username',''),))
+        follower_count = latest[0]['followers'] if latest else None
+        return {'goal': goal[0] if goal else None, 'profile': latest[0] if latest else None,
+                'remaining': max(0,goal[0]['target_followers']-follower_count) if goal and follower_count is not None else None}
+
+    @app.put("/api/v1/growth/goal", dependencies=[Depends(session)])
+    def set_growth_goal(body: GrowthGoal):
+        now = int(time.time())
+        with store.db(True) as c:
+            c.execute("INSERT INTO growth_goals(id,target_followers,created_at,updated_at) VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET target_followers=excluded.target_followers,updated_at=excluded.updated_at",
+                      (body.target_followers,now,now))
+            store.event('goal','已更新涨粉目标',{'target_followers':body.target_followers},c)
+        return growth()
+
+    @app.post("/api/v1/growth/read", dependencies=[Depends(session)])
+    def read_growth():
+        from .browser_reads import BrowserReads
+        if not BrowserReads(store).connected(8):
+            fail("连接助手需要更新至 1.3.8，才能读取账号数据。", 409)
+        try:
+            return {'task_id': jobs.enqueue('profile_metric',{},dedupe='profile:manual')}
+        except JobError as exc:
+            fail(exc.code,409)
+
+    @app.get("/api/v1/drafts/{draft_id}/metrics", dependencies=[Depends(session)])
+    def draft_metrics(draft_id: str):
+        publication = store.rows("SELECT * FROM draft_publications WHERE draft_id=?",(draft_id,))
+        if not publication:
+            if not store.rows("SELECT id FROM drafts WHERE id=?",(draft_id,)): fail("草稿不存在",404)
+            return {'publication':None,'snapshots':[]}
+        tweet_id = publication[0]['tweet_id']
+        snapshots = store.rows("SELECT observed_at,published_at,age_seconds,target_window,window_status,source,views,likes,replies,reposts,quotes,bookmarks FROM post_metric_snapshots WHERE tweet_id=? ORDER BY observed_at DESC",(tweet_id,)) if tweet_id else []
+        return {'publication':publication[0],'snapshots':snapshots}
+
+    @app.post("/api/v1/drafts/{draft_id}/metrics/read", dependencies=[Depends(session)])
+    def read_draft_metrics(draft_id: str):
+        from .browser_reads import BrowserReads
+        publication = store.rows("SELECT tweet_id,author FROM draft_publications WHERE draft_id=? AND user_confirmed=1",(draft_id,))
+        if not publication: fail("请先确认发布并填写帖子链接。",409)
+        if not publication[0]['tweet_id'] or not publication[0]['author']:
+            fail("请先补充你发布后的帖子链接。",409)
+        if not BrowserReads(store).connected(8):
+            fail("连接助手需要更新至 1.3.8，才能读取帖子数据。",409)
+        try:
+            return {'task_id': jobs.enqueue('metric',{'tweet_id':publication[0]['tweet_id'],'target_window':'baseline'},dedupe='metric:manual:'+publication[0]['tweet_id'])}
+        except JobError as exc:
+            fail(exc.code,409)
 
     @app.post("/api/v1/drafts/{draft_id}/archive", dependencies=[Depends(session)])
     def archive(draft_id: str):

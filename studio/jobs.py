@@ -25,6 +25,7 @@ class Jobs:
         self.store = store
         self.engines = Engines(store)
         self.secrets = Secrets(store.root)
+        self.last_measurement_schedule = 0
 
     def enqueue(self, kind, payload=None, automatic=False, dedupe=None):
         payload = dict(payload or {})
@@ -121,7 +122,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] in ("sync", "context") else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -186,6 +187,9 @@ class Jobs:
         if self.store.get("paused"):
             return
         now = int(time.time())
+        if now - self.last_measurement_schedule >= 60:
+            self.last_measurement_schedule = now
+            self.schedule_measurements(now)
         if self.store.get("x_status") in [
             "ready",
             "partial",
@@ -214,6 +218,35 @@ class Jobs:
                 )
             except JobError:
                 pass
+
+    def schedule_measurements(self, now):
+        browser = BrowserReads(self.store)
+        if not browser.connected(8): return
+        account = self.store.get('x_username','')
+        if not account: return
+        day = datetime.now(ZoneInfo(self.store.get('timezone','Asia/Shanghai'))).date().isoformat()
+        if not self.store.rows("SELECT id FROM profile_snapshots WHERE account=? AND day=? LIMIT 1",(account,day)):
+            key = 'profile:' + day
+            recent = self.store.rows("SELECT max(created) AS ts FROM tasks WHERE dedupe=?",(key,))[0]['ts'] or 0
+            if now-recent >= 3600:
+                try: self.enqueue('profile_metric', {'day':day}, automatic=True, dedupe=key)
+                except JobError: pass
+        publications = self.store.rows("SELECT tweet_id,published_at FROM draft_publications WHERE user_confirmed=1 AND tweet_id IS NOT NULL AND lower(author)=lower(?) ORDER BY COALESCE(user_confirmed_at,0) DESC LIMIT 200",(account,))
+        for publication in publications:
+            tweet_id = publication['tweet_id']
+            snapshots = self.store.rows("SELECT target_window FROM post_metric_snapshots WHERE tweet_id=?",(tweet_id,))
+            done = {item['target_window'] for item in snapshots}
+            published = publication['published_at']
+            target = ('baseline' if 'baseline' not in done else
+                      '24h' if published and now>=published+86400 and '24h' not in done else
+                      '72h' if published and now>=published+259200 and '72h' not in done else None)
+            if not target: continue
+            key = f'metric:{tweet_id}:{target}'
+            recent = self.store.rows("SELECT max(created) AS ts FROM tasks WHERE dedupe=?",(key,))[0]['ts'] or 0
+            if now-recent < 3600: continue
+            try: self.enqueue('metric', {'tweet_id':tweet_id,'target_window':target}, automatic=True, dedupe=key)
+            except JobError: pass
+            break
 
     async def sync(self, job):
         reader = XReader(self.secrets)
@@ -543,7 +576,7 @@ class Jobs:
                     ),
                 )
                 c.execute(
-                    "INSERT INTO draft_versions VALUES(?,?,?,?)",
+                    "INSERT INTO draft_versions(draft_id,version,text,created) VALUES(?,?,?,?)",
                     (target, version, text, int(time.time())),
                 )
             else:
@@ -571,6 +604,8 @@ class Jobs:
             result = await (
                 self.sync(job) if job["kind"] == "sync" else
                 BrowserReads(self.store).enrich(job, self.alive) if job["kind"] == "context" else
+                BrowserReads(self.store).metric(job, self.alive) if job["kind"] == "metric" else
+                BrowserReads(self.store).profile(job, self.alive) if job["kind"] == "profile_metric" else
                 self.generate(job)
             )
             self.finish(job, "succeeded", result)

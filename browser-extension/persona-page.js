@@ -25,6 +25,55 @@ export async function readPersonaPage(action, expected) {
     return { state: "account_mismatch", account };
   if (!primary) return { state: "waiting_browser" };
   if (action.kind === "identity") return { state: "ready", account };
+  if (action.kind === "metric_snapshot") {
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d{1,30}$/.test(action.post_id || ""))
+      return { state: "invalid_request" };
+    if (location.pathname.toLowerCase() !== `/${action.author.toLowerCase()}/status/${action.post_id}`)
+      return { state: "source_error" };
+    const path = `/${action.author.toLowerCase()}/status/${action.post_id}`;
+    const article = [...primary.querySelectorAll('article[data-testid="tweet"]')].find((item) =>
+      [...item.querySelectorAll('time')].some((node) => !node.closest('[data-testid="quoteTweet"]') &&
+        node.closest('a')?.getAttribute('href')?.toLowerCase() === path));
+    if (!article) return { state: "waiting_browser" };
+    const time = [...article.querySelectorAll('time')].find((node) =>
+      !node.closest('[data-testid="quoteTweet"]') && node.closest('a')?.getAttribute('href')?.toLowerCase() === path);
+    const group = article.querySelector('[role="group"]');
+    const labels = [group?.getAttribute('aria-label') || '', ...[...article.querySelectorAll('[aria-label]')]
+      .map((node) => node.getAttribute('aria-label') || '')].join(' · ');
+    const count = (en, zh) => {
+      const a = labels.match(new RegExp(`(?:^|[^\\d])([\\d,]+)\\s+${en}\\b`, 'i'));
+      const b = labels.match(new RegExp(`${zh}[^\\d]*([\\d,]+)`));
+      const c = labels.match(new RegExp(`([\\d,]+)\\s*${zh}`));
+      const value = (a || b || c)?.[1]?.replaceAll(',', '');
+      return value && /^\d+$/.test(value) ? Number(value) : null;
+    };
+    const before = article.innerText.split(article.querySelector('[data-testid="tweetText"]')?.innerText || '\uffff')[0] || '';
+    const kind = /Replying to|回复\s?@|回复给|正在回复/.test(before) ? 'reply' :
+      article.querySelector('[data-testid="quoteTweet"]') ? 'quote' : 'post';
+    return { state: 'ready', account, post_id: action.post_id, author: action.author,
+      record: { created_at: time?.dateTime || '', kind,
+        views: count('views?', '次查看|次浏览|浏览'),
+        likes: count('likes?', '喜欢|点赞'),
+        replies: count('repl(?:y|ies)', '回复'),
+        reposts: count('reposts?', '转发|转帖'),
+        quotes: count('quotes?', '引用'),
+        bookmarks: count('bookmarks?', '书签') } };
+  }
+  if (action.kind === "profile_snapshot") {
+    if (location.pathname.toLowerCase() !== `/${account.toLowerCase()}`)
+      return { state: 'source_error' };
+    const followersLink = primary.querySelector(`a[href="/${account}/followers"],a[href="/${account}/verified_followers"]`);
+    if (!followersLink) return { state: 'waiting_browser' };
+    // Abbreviated values such as 1.2K are unknown, never rounded into a daily count.
+    const label = followersLink.getAttribute('aria-label') || followersLink.innerText || '';
+    const match = label.match(/(?:^|\s)([\d,]+)\s*(?:Followers|粉丝)/i);
+    const followers = match ? Number(match[1].replaceAll(',', '')) : null;
+    const pinned = [...primary.querySelectorAll('article[data-testid="tweet"]')].find((article) =>
+      /^(Pinned|已置顶|置顶)$/m.test(article.querySelector('[data-testid="socialContext"]')?.innerText || ''));
+    const pinned_tweet_id = pinned?.querySelector('time')?.closest('a')?.getAttribute('href')?.match(/\/status\/(\d+)/)?.[1] || null;
+    return { state: 'ready', account, record: { followers, pinned_tweet_id,
+      bio: primary.querySelector('[data-testid="UserDescription"]')?.innerText || '' } };
+  }
   if (action.kind === "sync_snapshot" && /Something went wrong|Try reloading|出了点问题|重新加载/.test(primary.innerText))
     return { state: "source_error" };
   if (action.kind === "sync_snapshot" && !primary.querySelector('article[data-testid="tweet"]')) {
