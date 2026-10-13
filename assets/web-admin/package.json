@@ -11,6 +11,7 @@
     "build:desktop": "tsc --noEmit && vite build --mode desktop --outDir ../../.vercel-dist --emptyOutDir && node build-desktop.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "@vitejs/plugin-react": "^5.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
