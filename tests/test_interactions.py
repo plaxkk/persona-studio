@@ -193,6 +193,27 @@ def test_context_read_survives_a_stale_heartbeat_during_navigation(client, monke
     assert json.loads(store.rows("SELECT context FROM posts WHERE id='8402'")[0]["context"])["detail_checked"]
 
 
+def test_browser_dispatch_serializes_detail_navigation(client):
+    store = client.app.state.store
+    store.set("x_username", "owner")
+    for ident in (8403, 8404):
+        add_post(store, ident, context={"detail_checked": False})
+    now = int(time.time())
+    with store.db(True) as db:
+        db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,?,?,?,?)",
+                   ("context-serial", "context", '{"post_ids":["8403","8404"]}', "running", now, now, now))
+        for ident in (8403, 8404):
+            db.execute("INSERT INTO interaction_context_reads(task_id,post_id,author,account,status,updated) VALUES(?,?,?,?,?,?)",
+                       ("context-serial", str(ident), "someone", "owner", "queued", now))
+    reads = BrowserReads(store)
+    first = reads.next_action()
+    assert first["post_id"] == "8403"
+    assert reads.next_action() is None
+    reads.receive(first["id"], {"state": "ready", "post_id": "8403", "author": "someone",
+        "account": "owner", "record": {"id": "8403", "author": "someone", "text": "完整正文"}})
+    assert reads.next_action()["post_id"] == "8404"
+
+
 def test_extension_bridge_dispatches_context_id(client):
     store = client.app.state.store
     store.set("x_username", "owner")

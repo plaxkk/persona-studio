@@ -22,6 +22,16 @@ class BrowserReads:
 
     def next_action(self):
         with self.store.db(True) as c:
+            # All browser reads share one Chrome tab. Two in-flight actions can
+            # navigate it away from each other and strand both detail reads.
+            busy = c.execute("""SELECT 1 FROM browser_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                UNION ALL
+                SELECT 1 FROM interaction_context_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                LIMIT 1""").fetchone()
+            if busy:
+                return None
             row = c.execute("SELECT b.* FROM browser_reads b JOIN tasks t ON t.id=b.task_id WHERE b.status='queued' AND b.updated<=? AND t.status='running' AND t.cancel=0 ORDER BY b.id LIMIT 1", (int(time.time()),)).fetchone()
             if row:
                 c.execute("UPDATE browser_reads SET status='sent',updated=? WHERE id=?", (int(time.time()), row['id']))
