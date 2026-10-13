@@ -169,6 +169,15 @@ export type Connections = {
     status: string;
     credentials: Record<string, boolean>;
   };
+  supabase: {
+    url: string;
+    configured: boolean;
+    queued: number;
+    synced: number;
+    last_status: string;
+    last_checked_at: number;
+    last_error: string;
+  };
 };
 export type Message = {
   id: number;

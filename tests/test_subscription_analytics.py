@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from studio.analytics_store import record_content_page
@@ -48,6 +50,7 @@ def test_content_page_staging_is_atomic_and_retry_idempotent(tmp_path):
             "organic_metrics_total": [{"metric_type": "Impressions", "metric_value": 3}]}},
         {"rest_id": "124", "result": {"__typename": "TweetWithVisibilityResults"}},
     ]}}}}}
+    payload["request_headers"] = {"authorization": "must-not-be-stored"}
     args = dict(run_id="content-job-1", account="Owner", payload=payload,
                 from_time="2026-07-16T00:00:00Z", to_time="2026-10-13T23:59:59Z",
                 max_results=1000, observed_at=1791880000)
@@ -61,6 +64,7 @@ def test_content_page_staging_is_atomic_and_retry_idempotent(tmp_path):
         "SELECT reason FROM analytics_coverage_gaps ORDER BY item_index")] == [
             "duplicate_post", "visibility_restricted"]
     assert store.rows("SELECT cloud_status FROM analytics_runs")[0]["cloud_status"] == "pending"
+    assert list(json.loads(store.rows("SELECT raw_json FROM analytics_runs")[0]["raw_json"])) == ["data"]
     with pytest.raises(AnalyticsShapeError, match="run_id_conflict"):
         record_content_page(store, **{**args, "observed_at": 1791880001})
     assert store.rows("SELECT count(*) AS n FROM analytics_runs")[0]["n"] == 1

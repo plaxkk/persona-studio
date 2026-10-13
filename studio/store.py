@@ -28,6 +28,9 @@ DEFAULTS = dict(
     per_round=3,
     worker_heartbeat=0,
     telegram_status="not_connected",
+    supabase_url="",
+    analytics_cloud_last_status="not_configured",
+    analytics_cloud_checked_at=0,
 )
 PERSONA = dict(
     name="未命名的角色",

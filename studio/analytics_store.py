@@ -26,7 +26,10 @@ def record_content_page(store, *, run_id: str, account: str, payload: dict,
         raise AnalyticsShapeError("account_invalid")
     parsed = parse_content_page(payload, from_time=from_time, to_time=to_time,
                                 max_results=max_results, observed_at=observed_at)
-    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    # Keep only the GraphQL business payload. Caller metadata such as request
+    # headers must never enter the local outbox or Supabase JSONB column.
+    raw = json.dumps({"data": payload["data"]}, ensure_ascii=False,
+                     separators=(",", ":"), sort_keys=True)
     if len(raw.encode("utf-8")) > MAX_RAW_BYTES:
         raise AnalyticsShapeError("content_response_too_large")
     metadata = (account.lower(), parsed["source"], from_time, to_time,

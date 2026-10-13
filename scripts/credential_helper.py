@@ -29,6 +29,7 @@ SENSITIVE_KEYS = {
     "X_AUTH_TOKEN",
     "X_CT0",
     "FACTORY_ADMIN_TOKEN",
+    "SUPABASE_SECRET_KEY",
 }
 
 

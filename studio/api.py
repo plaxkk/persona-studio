@@ -32,6 +32,7 @@ from .engines import Engines, EngineError
 from .jobs import Jobs, JobError
 from .xreader import XReader, ReadError
 from .interactions import candidate_ids, context_state, enrich_rows, reply_block, topic_for, scene_for
+from .supabase_analytics import SupabaseConfigError, _config as check_supabase_config, configured as supabase_configured
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = {
@@ -122,6 +123,11 @@ class TelegramConfig(Input):
     owner_id: str
     token: str = Field(default="", max_length=4096)
     enabled: bool = False
+
+
+class SupabaseConfig(Input):
+    url: str = Field(max_length=500)
+    secret_key: str = Field(default="", max_length=4096)
 
 
 class Generate(Input):
@@ -747,6 +753,10 @@ def create_app(state_dir=None, public_url=None):
 
     @app.get("/api/v1/connections", dependencies=[Depends(session)])
     def connections():
+        cloud_counts = {row["cloud_status"]: row["n"] for row in store.rows(
+            "SELECT cloud_status,count(*) AS n FROM analytics_runs GROUP BY cloud_status")}
+        cloud_error = store.rows("SELECT cloud_error FROM analytics_runs WHERE cloud_status='retry' "
+                                 "ORDER BY observed_at DESC LIMIT 1")
         return {
             "x": {
                 "username": store.get("x_username"),
@@ -760,7 +770,52 @@ def create_app(state_dir=None, public_url=None):
                 "status": store.get("telegram_status"),
                 "credentials": vault.present("telegram"),
             },
+            "supabase": {
+                "url": store.get("supabase_url"),
+                "configured": supabase_configured(store),
+                "queued": cloud_counts.get("pending", 0) + cloud_counts.get("retry", 0)
+                          + cloud_counts.get("sending", 0),
+                "synced": cloud_counts.get("synced", 0),
+                "last_status": store.get("analytics_cloud_last_status"),
+                "last_checked_at": store.get("analytics_cloud_checked_at"),
+                "last_error": cloud_error[0]["cloud_error"] if cloud_error else "",
+            },
         }
+
+    @app.put("/api/v1/connections/supabase", dependencies=[Depends(session)])
+    def connect_supabase(body: SupabaseConfig):
+        url = body.url.strip().rstrip("/")
+        old_url = store.get("supabase_url")
+        if old_url and url != old_url:
+            fail("切换 Supabase 项目前，请先移除旧连接。", 409)
+        if url != old_url and not body.secret_key:
+            fail("切换 Supabase 项目时请同时填写该项目的新密钥。", 422)
+        key = body.secret_key or vault.get("SUPABASE_SECRET_KEY")
+        try:
+            check_supabase_config({"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": key})
+        except SupabaseConfigError:
+            fail("请填写有效的 Supabase 项目地址和新式 secret key。", 422)
+        if body.secret_key:
+            vault.update({"SUPABASE_SECRET_KEY": body.secret_key})
+        with store.db(True) as db:
+            store.set("supabase_url", url, db)
+            if url != old_url:
+                db.execute("UPDATE analytics_runs SET cloud_status='pending',cloud_retry_at=0,"
+                           "cloud_error='',cloud_synced_at=NULL")
+            else:
+                db.execute("UPDATE analytics_runs SET cloud_status='pending',cloud_retry_at=0,"
+                           "cloud_error='' WHERE cloud_status='retry'")
+            store.set("analytics_cloud_last_status", "pending", db)
+            store.set("analytics_cloud_checked_at", 0, db)
+        return {"configured": True}
+
+    @app.delete("/api/v1/connections/supabase", dependencies=[Depends(session)])
+    def delete_supabase():
+        vault.delete("supabase")
+        store.set("supabase_url", "")
+        store.set("analytics_cloud_last_status", "not_configured")
+        store.set("analytics_cloud_checked_at", 0)
+        return {"configured": False}
 
     @app.put("/api/v1/connections/x", dependencies=[Depends(session)])
     def connect_x(body: XConfig):
