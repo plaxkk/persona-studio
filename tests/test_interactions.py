@@ -158,6 +158,30 @@ def test_context_task_fails_when_x_detail_never_loads(client):
     assert not json.loads(store.rows("SELECT context FROM posts WHERE id='8401'")[0]["context"]).get("detail_checked")
 
 
+def test_context_read_survives_a_stale_heartbeat_during_navigation(client, monkeypatch):
+    store = client.app.state.store
+    store.set("x_username", "owner")
+    add_post(store, 8402, context={"detail_checked": False})
+    now = int(time.time())
+    with store.db(True) as db:
+        db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,?,?,?,?)",
+                   ("context-reconnect", "context", '{"post_ids":["8402"]}', "running", now, now, now))
+    reads = BrowserReads(store)
+    connected_calls = iter((True, False))
+    monkeypatch.setattr(reads, "connected", lambda min_patch=7: next(connected_calls, True))
+
+    async def finish_in_flight_read(_):
+        action = reads.next_action()
+        reads.receive(action["id"], {"state": "ready", "post_id": "8402", "author": "someone",
+            "account": "owner", "record": {"id": "8402", "author": "someone", "text": "已加载的完整正文"}})
+
+    monkeypatch.setattr("studio.browser_reads.asyncio.sleep", finish_in_flight_read)
+    result = asyncio.run(reads.enrich(
+        {"id": "context-reconnect", "payload": {"post_ids": ["8402"]}}, lambda _: True))
+    assert result == {"checked": 1, "failed": 0, "requested": 1, "complete": True}
+    assert json.loads(store.rows("SELECT context FROM posts WHERE id='8402'")[0]["context"])["detail_checked"]
+
+
 def test_extension_bridge_dispatches_context_id(client):
     store = client.app.state.store
     store.set("x_username", "owner")

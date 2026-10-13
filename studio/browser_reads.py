@@ -101,7 +101,9 @@ class BrowserReads:
             if not alive(job): raise ReadError('cancelled')
             rows = self.store.rows("SELECT * FROM interaction_context_reads WHERE task_id=?", (job['id'],))
             if all(r['status']=='done' for r in rows): break
-            if not self.connected(7): break
+            # Detail navigation can occupy the extension long enough for its
+            # heartbeat to expire. Keep the bounded task open so the in-flight
+            # read can reconnect and return, instead of abandoning the queue.
             await asyncio.sleep(1)
         updated, failed = 0, 0
         with self.store.db(True) as c:
