@@ -10,6 +10,24 @@ from studio.browser_reads import BrowserReads
 from studio.store import Store
 
 
+def test_metric_and_profile_reads_share_one_browser_navigation(tmp_path):
+    store = Store(tmp_path)
+    now = int(time.time())
+    with store.db(True) as db:
+        for ident, kind in (("metric-serial", "metric"), ("profile-serial", "profile")):
+            db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,'running',?,?,?)",
+                       (ident, kind, '{}', now, now, now))
+        db.execute("INSERT INTO metric_reads(task_id,tweet_id,author,account,status,updated) VALUES(?,?,?,?,?,?)",
+                   ("metric-serial", "123", "owner", "owner", "sent", now))
+        db.execute("INSERT INTO profile_reads(task_id,account,status,updated) VALUES(?,?,?,?)",
+                   ("profile-serial", "owner", "queued", now))
+    reader = BrowserReads(store)
+    assert reader.next_action() is None
+    with store.db(True) as db:
+        db.execute("UPDATE metric_reads SET status='done' WHERE task_id='metric-serial'")
+    assert reader.next_action()["kind"] == "profile_read"
+
+
 def test_v3_confirmed_draft_migrates_without_inventing_timestamps(tmp_path):
     path = tmp_path / 'studio.sqlite3'
     with sqlite3.connect(path) as db:

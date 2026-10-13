@@ -130,6 +130,10 @@ def candidate_ids(store, limit=30):
         row["review"] = {"scene": scene_for(row, row["context"]),
                          "topic": topic_for(row["text"]),
                          "context_status": context_state(row["context"])[0]}
+    # A short list of relevant conversations is better than padding the daily
+    # recommendation with unrelated timeline posts just to reach 30 items.
+    rows = [row for row in rows if row["review"]["scene"] == "direct"
+            or row["review"]["topic"] != "other"]
     rows.sort(key=lambda p: (
         0 if p["review"]["scene"] == "direct" and re.search(r"报错|故障|无法|出错|纠正|不对|bug|broken|error", p["text"], re.I) else
         1 if p["review"]["scene"] == "direct" else 2,

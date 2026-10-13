@@ -23,6 +23,22 @@ class BrowserReads:
 
     def next_action(self):
         with self.store.db(True) as c:
+            # All browser reads share one Chrome tab. Two in-flight actions can
+            # navigate it away from each other and strand both detail reads.
+            busy = c.execute("""SELECT 1 FROM browser_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                UNION ALL
+                SELECT 1 FROM interaction_context_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                UNION ALL
+                SELECT 1 FROM metric_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                UNION ALL
+                SELECT 1 FROM profile_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                LIMIT 1""").fetchone()
+            if busy:
+                return None
             row = c.execute("SELECT b.* FROM browser_reads b JOIN tasks t ON t.id=b.task_id WHERE b.status='queued' AND b.updated<=? AND t.status='running' AND t.cancel=0 ORDER BY b.id LIMIT 1", (int(time.time()),)).fetchone()
             if row:
                 c.execute("UPDATE browser_reads SET status='sent',updated=? WHERE id=?", (int(time.time()), row['id']))
@@ -206,7 +222,9 @@ class BrowserReads:
             if not alive(job): raise ReadError('cancelled')
             rows = self.store.rows("SELECT * FROM interaction_context_reads WHERE task_id=?", (job['id'],))
             if all(r['status']=='done' for r in rows): break
-            if not self.connected(7): break
+            # Detail navigation can occupy the extension long enough for its
+            # heartbeat to expire. Keep the bounded task open so the in-flight
+            # read can reconnect and return, instead of abandoning the queue.
             await asyncio.sleep(1)
         updated, failed = 0, 0
         with self.store.db(True) as c:

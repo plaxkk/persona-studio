@@ -47,6 +47,17 @@ def test_page_search_past_200_and_topic_count(client):
     assert client.get("/api/v1/interactions/page?limit=1000").status_code == 422
 
 
+def test_daily_recommendations_do_not_fill_with_unrelated_timeline_posts(client):
+    store = client.app.state.store
+    for ident in range(1300, 1340):
+        add_post(store, ident, text="今天天气不错")
+    add_post(store, 1400, text="Codex 多轮对话怎么保存？")
+    add_post(store, 1401, text="谢谢你", context={"source": "replies"})
+    recommended = client.get("/api/v1/interactions/page?view=recommended").json()
+    assert {row["id"] for row in recommended["items"]} == {"1400", "1401"}
+    assert recommended["total"] == 2
+
+
 def test_context_gate_skills_and_review(client):
     store = client.app.state.store
     add_post(store, 6001, context={"detail_checked": False, "parent_needed": True})
@@ -156,6 +167,51 @@ def test_context_task_fails_when_x_detail_never_loads(client):
             {"id": "context-unavailable", "payload": {"post_ids": ["8401"]}}, lambda _: True))
     assert error.value.code == "context_unavailable"
     assert not json.loads(store.rows("SELECT context FROM posts WHERE id='8401'")[0]["context"]).get("detail_checked")
+
+
+def test_context_read_survives_a_stale_heartbeat_during_navigation(client, monkeypatch):
+    store = client.app.state.store
+    store.set("x_username", "owner")
+    add_post(store, 8402, context={"detail_checked": False})
+    now = int(time.time())
+    with store.db(True) as db:
+        db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,?,?,?,?)",
+                   ("context-reconnect", "context", '{"post_ids":["8402"]}', "running", now, now, now))
+    reads = BrowserReads(store)
+    connected_calls = iter((True, False))
+    monkeypatch.setattr(reads, "connected", lambda min_patch=7: next(connected_calls, True))
+
+    async def finish_in_flight_read(_):
+        action = reads.next_action()
+        reads.receive(action["id"], {"state": "ready", "post_id": "8402", "author": "someone",
+            "account": "owner", "record": {"id": "8402", "author": "someone", "text": "已加载的完整正文"}})
+
+    monkeypatch.setattr("studio.browser_reads.asyncio.sleep", finish_in_flight_read)
+    result = asyncio.run(reads.enrich(
+        {"id": "context-reconnect", "payload": {"post_ids": ["8402"]}}, lambda _: True))
+    assert result == {"checked": 1, "failed": 0, "requested": 1, "complete": True}
+    assert json.loads(store.rows("SELECT context FROM posts WHERE id='8402'")[0]["context"])["detail_checked"]
+
+
+def test_browser_dispatch_serializes_detail_navigation(client):
+    store = client.app.state.store
+    store.set("x_username", "owner")
+    for ident in (8403, 8404):
+        add_post(store, ident, context={"detail_checked": False})
+    now = int(time.time())
+    with store.db(True) as db:
+        db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,?,?,?,?)",
+                   ("context-serial", "context", '{"post_ids":["8403","8404"]}', "running", now, now, now))
+        for ident in (8403, 8404):
+            db.execute("INSERT INTO interaction_context_reads(task_id,post_id,author,account,status,updated) VALUES(?,?,?,?,?,?)",
+                       ("context-serial", str(ident), "someone", "owner", "queued", now))
+    reads = BrowserReads(store)
+    first = reads.next_action()
+    assert first["post_id"] == "8403"
+    assert reads.next_action() is None
+    reads.receive(first["id"], {"state": "ready", "post_id": "8403", "author": "someone",
+        "account": "owner", "record": {"id": "8403", "author": "someone", "text": "完整正文"}})
+    assert reads.next_action()["post_id"] == "8404"
 
 
 def test_extension_bridge_dispatches_context_id(client):

@@ -35,7 +35,9 @@ async def main():
         assert [item["description"] for item in detail["record"]["media"]] == [
             "引用里的截图", "包含迁移版本与失败原因的截图", "上文的流程图"]
         bad = await page.evaluate('async () => readPersonaPage({kind:"sync_detail",author:"visitor",post_id:"999"},"owner")')
-        assert bad["state"] == "source_error"
+        # A different detail URL may still be loading after navigation. Do not
+        # misclassify it as a parsed post or a permanent source error.
+        assert bad["state"] == "waiting_browser"
         await browser.close()
     print("PASS synthetic X detail: text, parent, quote, media and URL validation")
 
