@@ -33,6 +33,7 @@ from .jobs import Jobs, JobError
 from .xreader import XReader, ReadError
 from .interactions import candidate_ids, context_state, enrich_rows, reply_block, topic_for, scene_for
 from .supabase_analytics import SupabaseConfigError, _config as check_supabase_config, configured as supabase_configured
+from .analytics_browser_reads import CONTENT_DAYS
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = {
@@ -129,6 +130,10 @@ class TelegramConfig(Input):
 class SupabaseConfig(Input):
     url: str = Field(max_length=500)
     secret_key: str = Field(default="", max_length=4096)
+
+
+class AnalyticsContentRequest(Input):
+    days: int = 28
 
 
 class Generate(Input):
@@ -782,6 +787,32 @@ def create_app(state_dir=None, public_url=None):
                 "last_error": cloud_error[0]["cloud_error"] if cloud_error else "",
             },
         }
+
+    @app.get("/api/v1/analytics/content", dependencies=[Depends(session)])
+    def analytics_content():
+        from .browser_reads import BrowserReads
+        return {
+            "browser_ready": BrowserReads(store).connected(11),
+            "runs": store.rows(
+                "SELECT id,account,source,window_from,window_to,observed_at,"
+                "request_limit,received_count,parsed_count,gap_count,"
+                "at_request_limit,cloud_status,cloud_synced_at "
+                "FROM analytics_runs ORDER BY observed_at DESC,id DESC LIMIT 20"),
+            "tasks": store.rows(
+                "SELECT id,status,created,updated,error,result FROM tasks "
+                "WHERE kind='analytics_content' ORDER BY created DESC,id DESC LIMIT 10"),
+        }
+
+    @app.post("/api/v1/analytics/content/read", dependencies=[Depends(session)])
+    def read_analytics_content(body: AnalyticsContentRequest):
+        from .browser_reads import BrowserReads
+        if body.days not in CONTENT_DAYS:
+            fail("请选择 7、14、28 或 90 天的数据范围。", 422)
+        if not BrowserReads(store).connected(11):
+            fail("连接助手需要更新至 1.3.11，才能读取 Subscription Analytics。", 409)
+        return {"task_id": jobs.enqueue(
+            "analytics_content", {"days": body.days},
+            dedupe=f"analytics-content-{body.days}")}
 
     @app.put("/api/v1/connections/supabase", dependencies=[Depends(session)])
     def connect_supabase(body: SupabaseConfig):

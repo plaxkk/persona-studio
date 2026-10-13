@@ -11,6 +11,7 @@ from .xreader import XReader, ReadError
 from .inspiration import collect_work
 from .sync_status import failed as sync_failed
 from .browser_reads import BrowserReads
+from .analytics_browser_reads import AnalyticsBrowserReads
 from .interactions import candidate_ids, reply_block
 
 
@@ -122,7 +123,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric") else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -606,6 +607,7 @@ class Jobs:
                 BrowserReads(self.store).enrich(job, self.alive) if job["kind"] == "context" else
                 BrowserReads(self.store).metric(job, self.alive) if job["kind"] == "metric" else
                 BrowserReads(self.store).profile(job, self.alive) if job["kind"] == "profile_metric" else
+                AnalyticsBrowserReads(self.store).read(job, self.alive) if job["kind"] == "analytics_content" else
                 self.generate(job)
             )
             self.finish(job, "succeeded", result)

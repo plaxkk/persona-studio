@@ -88,7 +88,7 @@ def parse_content_page(payload: dict, *, from_time: str, to_time: str,
                 reason = "invalid_tweet"
         gaps.append({"index": index, "post_id": post_id or None, "reason": reason})
     return {
-        "source": "subscription_content_posts",
+        "source": "subscription_content_query",
         "from_time": from_time, "to_time": to_time, "observed_at": observed_at,
         "max_results": max_results, "received_count": len(results),
         "parsed_count": len(posts), "gap_count": len(gaps),

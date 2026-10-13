@@ -1,10 +1,12 @@
 import { readPersonaPage } from "./persona-page.js";
 import { operateSync } from "./sync-browser.js";
+import { operateAnalyticsContent } from "./analytics-browser.js";
 import { encodeResultFrames } from "./result-chunks.js";
 let socket,
   connecting = false;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function operate(action) {
+  if (action.kind === "analytics_content_read") return operateAnalyticsContent(action);
   if (["sync_read", "context_read", "metric_read", "profile_read"].includes(action.kind)) return operateSync(action);
   const key = "persona-task-" + action.import_id;
   let saved = (await chrome.storage.session.get(key))[key];

@@ -228,6 +228,17 @@ class Store:
                     reason TEXT NOT NULL, PRIMARY KEY(run_id,item_index));
                 """)
                 c.execute("INSERT INTO migrations VALUES(5,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=6").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS analytics_browser_reads(
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+                    account TEXT NOT NULL, days INTEGER NOT NULL,
+                    status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}',
+                    updated INTEGER NOT NULL);
+                CREATE INDEX IF NOT EXISTS analytics_browser_queue
+                    ON analytics_browser_reads(status,updated);
+                """)
+                c.execute("INSERT INTO migrations VALUES(6,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

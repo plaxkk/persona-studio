@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.10','1.3.11','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.3.11','1.3.12','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -53,4 +53,24 @@ test('growth and publication metrics routes stay scoped to the local bridge',()=
  ]) { assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true); }
  assert.equal(allowedRoute('/growth/goal','GET'),false);
  assert.equal(allowedRoute('/drafts/'+id+'/metrics/export','POST'),false);
+});
+test('Subscription analytics read routes are specific and credentials stay local',()=>{
+ assert.equal(allowedRoute('/analytics/content','GET'),true);
+ assert.equal(allowedRoute('/analytics/content/read','POST'),true);
+ assert.equal(allowedRoute('/analytics/content/read','GET'),false);
+ assert.equal(allowedRoute('/analytics/content/export','POST'),false);
+ assert.equal(allowedRoute('/connections/supabase','PUT'),false);
+ const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
+ assert.deepEqual(manifest.content_scripts.map(({world,run_at})=>[world,run_at]),[['MAIN','document_start']]);
+});
+test('extension download contains every local script referenced by its manifest and imports',()=>{
+ const build=fs.readFileSync(new URL('../assets/web-admin/build-desktop.mjs',import.meta.url),'utf8');
+ const names=new Set([...build.matchAll(/"([\w-]+\.(?:js|json|html|css|md))"/g)].map(match=>match[1]));
+ const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
+ const referenced=[manifest.background.service_worker,...manifest.content_scripts.flatMap(item=>item.js)];
+ for(const name of names) if(name.endsWith('.js')) {
+  const source=fs.readFileSync(new URL('../browser-extension/'+name,import.meta.url),'utf8');
+  referenced.push(...[...source.matchAll(/from\s+["']\.\/([\w-]+\.js)["']/g)].map(match=>match[1]));
+ }
+ for(const name of referenced) assert.ok(names.has(name),`${name} is missing from the ZIP`);
 });

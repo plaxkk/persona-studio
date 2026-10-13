@@ -11,6 +11,13 @@ import { api, label, time } from "../api";
 import type { Studio, Actions } from "../types";
 import { Heading, Button, Badge, Step, Empty } from "../components/UI";
 type Growth = { goal: { target_followers: number } | null; profile: { followers: number | null; observed_at: number; bio: string | null; pinned_tweet_id: string | null } | null; remaining: number | null };
+type AnalyticsContent = {
+  browser_ready: boolean;
+  runs: { id: string; window_from: string; window_to: string; observed_at: number;
+    received_count: number; parsed_count: number; gap_count: number;
+    at_request_limit: number; cloud_status: string }[];
+  tasks: { id: string; status: string; created: number; error: string }[];
+};
 export default function Home({
   data,
   actions,
@@ -21,9 +28,11 @@ export default function Home({
   const o = data.overview,
     s = o.settings;
   const [growth, setGrowth] = useState<Growth | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsContent | null>(null);
   const [target, setTarget] = useState(1000);
   useEffect(() => {
     api<Growth>("/growth").then((value) => { setGrowth(value); setTarget(value.goal?.target_followers || 1000); }).catch(() => setGrowth(null));
+    api<AnalyticsContent>("/analytics/content").then(setAnalytics).catch(() => setAnalytics(null));
   }, [s.x_username, o.events[0]?.id]);
   const engine = o.engines.find((e) => e.id === s.engine);
   const complete =
@@ -104,6 +113,16 @@ export default function Home({
           <Button onClick={() => void actions.run(() => api("/growth/read", "POST", {}), "已加入账号读取队列")}>读取粉丝数与主页</Button>
         </div>
         {growth?.profile && <small>主页介绍与置顶记录在本机每日快照中；无法读到精确粉丝数时显示“暂无数据”。</small>}
+      </section>
+      <section className="surface spaced">
+        <div className="section-title"><h2>Subscription 帖子数据</h2><Badge>{analytics?.browser_ready ? "可读取" : "等连接助手更新"}</Badge></div>
+        <p>从 X 的 Subscription → Analytics 读取逐帖可见指标。这里显示实际读取的查询范围和缺口，不把一次查询当作完整历史。</p>
+        <div className="draft-tools">
+          <Button disabled={!analytics?.browser_ready} onClick={() => void actions.run(() => api("/analytics/content/read", "POST", { days: 28 }), "已加入最近 28 天读取队列")}>读取最近 28 天</Button>
+          <Button disabled={!analytics?.browser_ready} onClick={() => void actions.run(() => api("/analytics/content/read", "POST", { days: 90 }), "已加入近 3 个月读取队列")}>读取近 3 个月</Button>
+        </div>
+        {analytics?.tasks[0] && <p>最近任务：{label(analytics.tasks[0].status)}{analytics.tasks[0].error ? ` · ${label(analytics.tasks[0].error)}` : ""}。</p>}
+        {analytics?.runs[0] ? <p>最近实际读取：{time(analytics.runs[0].observed_at)}，查询窗口 {analytics.runs[0].window_from} 至 {analytics.runs[0].window_to}；返回 {analytics.runs[0].received_count} 项，可解析 {analytics.runs[0].parsed_count} 项，缺口 {analytics.runs[0].gap_count} 项{analytics.runs[0].at_request_limit ? "；已达到单次查询上限，需进一步拆分" : ""}。云端状态：{label(analytics.runs[0].cloud_status)}。</p> : <p>暂无读取记录。</p>}
       </section>
       <div className="home-grid">
         <section className="surface">
