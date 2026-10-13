@@ -72,6 +72,20 @@ def test_context_gate_skills_and_review(client):
     assert client.delete(f"/api/v1/interactions/skills/{skill['id']}").status_code == 200
 
 
+def test_unrelated_skill_does_not_make_a_candidate_score_complete(client):
+    store = client.app.state.store
+    add_post(store, 6101, text="中国旅行签证怎么准备？")
+    skill = client.post("/api/v1/interactions/skills", json={
+        "name": "FastAPI", "level": "practiced", "evidence": "github.com/example/api",
+        "confirmed": True,
+    })
+    assert skill.status_code == 200
+    candidate = client.get("/api/v1/interactions/page?view=all").json()["items"][0]
+    assert candidate["review"]["topic"] == "travel"
+    assert candidate["review"]["score"]["contribution"]["value"] == 0
+    assert candidate["review"]["score_total"] is None
+
+
 def test_author_and_day_limits(client):
     store = client.app.state.store
     for ident in range(7000, 7025):
