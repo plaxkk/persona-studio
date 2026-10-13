@@ -1,5 +1,6 @@
 import { readPersonaPage } from "./persona-page.js";
 import { operateSync } from "./sync-browser.js";
+import { encodeResultFrames } from "./result-chunks.js";
 let socket,
   connecting = false;
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -149,16 +150,16 @@ export async function connectPersonaBrowser() {
         } catch {
           data = { state: "waiting_browser" };
         }
-        if (current.readyState === 1)
-          current.send(
-            JSON.stringify({
-              type: "result",
-              id: action.id,
-              import_id: action.import_id,
-              generation: action.generation,
-              data,
-            }),
-          );
+        if (current.readyState === 1) {
+          const frames = await encodeResultFrames({
+            type: "result", id: action.id, import_id: action.import_id,
+            generation: action.generation, data,
+          });
+          for (const frame of frames) {
+            if (current.readyState !== 1) break;
+            current.send(frame);
+          }
+        }
       } catch {
         current.close();
       }

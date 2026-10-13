@@ -11,6 +11,7 @@ from .browser_identity import EXTENSION_ORIGIN
 from .desktop import CLOUD_ORIGIN
 from .security import digest
 from .browser_reads import BrowserReads
+from .browser_chunks import ChunkError, ResultChunks
 
 
 class Create(BaseModel):
@@ -140,9 +141,29 @@ def register(app, store, session, allowed_hosts):
                     store.set("browser_reads_preferred", True)
                 action = imports.next_action() or reads.next_action()
                 await ws.send_json({"action": action})
-                msg = await asyncio.wait_for(ws.receive_json(), 40)
-                if len(json.dumps(msg)) > 950000:
-                    await ws.close(code=1009)
+                chunks = ResultChunks(action["id"]) if action else None
+                while True:
+                    msg = await asyncio.wait_for(ws.receive_json(), 40)
+                    if len(json.dumps(msg)) > 950000:
+                        await ws.close(code=1009)
+                        return
+                    if not isinstance(msg, dict):
+                        await ws.close(code=1008)
+                        return
+                    if msg.get("type") == "result_chunk":
+                        if chunks is None:
+                            await ws.close(code=1008)
+                            return
+                        try:
+                            msg = chunks.accept(msg)
+                        except ChunkError:
+                            await ws.close(code=1008)
+                            return
+                        if msg is None:
+                            continue
+                    elif chunks is not None and chunks.parts:
+                        await ws.close(code=1008)
+                        return
                     break
                 if msg.get("type") == "result":
                     if action and action.get('transport') == 'sync':
