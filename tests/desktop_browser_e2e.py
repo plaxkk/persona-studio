@@ -3,6 +3,7 @@
 import asyncio
 import mimetypes
 import json
+import os
 from studio.security import Secrets
 import shutil
 from deployment.install_browser_connector import install
@@ -63,12 +64,11 @@ async def main():
         worker_task = asyncio.create_task(worker())
         async with async_playwright() as p:
             default = Path(p.chromium.executable_path)
-            installed = sorted(
-                (Path.home() / "Library/Caches/ms-playwright").glob(
-                    "chromium-*/chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
-                )
-            )
-            executable = str(default if default.exists() else installed[-1])
+            candidates = [os.environ.get("STUDIO_CHROME"), str(default),
+                          "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"]
+            executable = next((path for path in candidates if path and Path(path).is_file()), None)
+            if executable is None:
+                raise RuntimeError("未找到 Playwright 或本机 Chrome；可设置 STUDIO_CHROME")
             # Register a distinct test host, never production credentials/state.
             extdir = Path(folder) / "extension"
             shutil.copytree("browser-extension", extdir)

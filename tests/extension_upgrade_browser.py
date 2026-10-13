@@ -1,5 +1,5 @@
 """Disposable desktop website regression, simulated extension + model only."""
-import json, mimetypes, tempfile
+import json, mimetypes, os, tempfile, time
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi.testclient import TestClient
@@ -20,8 +20,9 @@ with tempfile.TemporaryDirectory() as tmp:
    c.execute("UPDATE engines SET status='ready',config=? WHERE id='codex'",(json.dumps({'model':'fixture','auth':'chatgpt','reasoning':'medium'}),))
   app.state.store.set('engine','codex')
   with sync_playwright() as p:
-   chrome=sorted((Path.home()/'Library/Caches/ms-playwright').glob('chromium-*/chrome-mac-x64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'))[-1]
-   browser=p.chromium.launch(executable_path=str(chrome),headless=True)
+   chrome=next((path for path in [os.environ.get('STUDIO_CHROME'), p.chromium.executable_path, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'] if path and Path(path).is_file()),None)
+   if chrome is None: raise RuntimeError('未找到 Playwright 或本机 Chrome；可设置 STUDIO_CHROME')
+   browser=p.chromium.launch(executable_path=chrome,headless=True)
    page=browser.new_page(viewport={'width':1440,'height':1000})
    errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
    version=[None];requests=[]
@@ -58,12 +59,26 @@ with tempfile.TemporaryDirectory() as tmp:
    card.get_by_role('button',name='测试连接',exact=True).click()
    expect(page.get_by_text('已开始 Codex 真实连接测试',exact=True)).to_be_visible()
    assert ('POST','/engines/codex/verify') in requests
+   now=int(time.time())
+   app.state.store.set('paused',False)
+   app.state.store.set('worker_heartbeat',now)
+   app.state.store.set('x_status','partial')
+   app.state.store.set('last_sync',now-7200)
+   with app.state.store.db() as db:
+    db.execute("INSERT INTO sources(name,status,last_success,last_attempt,count) VALUES('own','ok',?,?,2)",(now-7200,now-7200))
+    db.execute("INSERT INTO sources(name,status,last_success,last_attempt,count) VALUES('mentions','browser_offline',?,?,0)",(now-7200,now))
+   page.reload()
+   page.get_by_role('button',name='工作室',exact=True).click()
+   expect(page.get_by_text('部分互动来源尚未成功读取',exact=False)).to_be_visible()
+   expect(page.get_by_text('最近有来源更新：',exact=False)).to_be_visible()
+   page.screenshot(path='/private/tmp/sync-health-desktop.png',full_page=True)
    page.set_viewport_size({'width':390,'height':844})
    expect(link).to_be_visible()
+   page.screenshot(path='/private/tmp/sync-health-mobile.png',full_page=True)
    page.get_by_role('button',name='安装 / 更新指南',exact=True).click()
    expect(page.get_by_role('button',name='关闭更新指南')).to_be_visible()
    assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
    page.screenshot(path='/private/tmp/extension-upgrade-mobile.png',full_page=True)
    assert not errors,errors
    browser.close()
-   print('PASS legacy error -> visible update guide; version recheck -> Codex request accepted; persistent desktop/mobile download; no page errors')
+   print('PASS upgrade guide, Codex request, stale sync health on desktop/mobile, and no page errors')

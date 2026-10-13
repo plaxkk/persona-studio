@@ -7,6 +7,7 @@ import time
 from email.utils import parsedate_to_datetime
 from .security import Secrets, sanitize
 from .safety import skip_source
+from .sync_status import SOURCES
 from .twikit_compat import CompatibleClient, XCompatibilityError
 import httpx
 
@@ -236,14 +237,16 @@ class XReader:
                 all_sources(), 40
             )  # verify already used <=15s, entire call <=55s.
         except asyncio.TimeoutError:
-            sources["round"] = {"status": "timeout", "count": 0}
+            for name in SOURCES:
+                sources.setdefault(name, {"status": "timeout", "count": 0})
         except ExceptionGroup as exc:
             if any(
                 isinstance(e, ReadError) and e.code == "needs_login"
                 for e in exc.exceptions
             ):
                 raise ReadError("needs_login") from None
-            sources["round"] = {"status": "source_error", "count": 0}
+            for name in SOURCES:
+                sources.setdefault(name, {"status": "source_error", "count": 0})
         # Own-thread context is kept in stored posts; full automatic coverage is never claimed.
         return {
             "identity": identity,

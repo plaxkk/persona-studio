@@ -3,12 +3,17 @@ import time
 from types import SimpleNamespace
 
 import pytest
+from fastapi.testclient import TestClient
 
+from studio.api import create_app
+from studio.browser_identity import EXTENSION_ORIGIN
+from studio.desktop import CLOUD_ORIGIN
 from studio.jobs import Jobs
 from studio.browser_reads import BrowserReads
+from studio.security import Secrets, digest
 from studio.store import Store
 from studio.sync_status import SOURCES, summary
-from studio.xreader import ReadError, published_time
+from studio.xreader import ReadError, XReader, published_time
 
 
 def test_failed_round_replaces_success_status_without_erasing_data(tmp_path, monkeypatch):
@@ -136,6 +141,105 @@ def test_browser_read_keeps_partial_results_and_deduplicates_posts(tmp_path):
     assert result['sources']['own']['status'] == 'ok'
     assert {post['id'] for post in result['posts']} == {'123', '456'}
     assert next(post for post in result['posts'] if post['id'] == '456')['context']['published_at'] == 1791856800
+
+
+def test_browser_read_resumes_unfinished_sources_after_worker_restart(tmp_path):
+    store = Store(tmp_path)
+    store.set('paused', False)
+    store.set('x_status', 'ready')
+    store.set('x_username', 'kkplayit')
+    with store.db() as c:
+        c.execute("INSERT INTO persona_browser_presence VALUES(1,'1.3.5',?)", (int(time.time()),))
+    jobs = Jobs(store)
+    ident = jobs.enqueue('sync')
+    first = jobs.claim()
+    assert first['id'] == ident
+    with store.db() as c:
+        c.execute("INSERT INTO browser_reads(task_id,source,account,status,result,updated) VALUES(?,?,?,'done',?,?)",
+                  (ident, 'own', 'kkplayit', '{"state":"ready","account":"kkplayit","records":[]}', int(time.time())))
+        c.execute("INSERT INTO browser_reads(task_id,source,account,status,updated) VALUES(?,?,?,'sent',?)",
+                  (ident, 'mentions', 'kkplayit', int(time.time())))
+    jobs.recover()
+    second = jobs.claim()
+    assert second['id'] == ident
+
+    async def scenario():
+        reads = BrowserReads(store)
+        pending = asyncio.create_task(reads.sync(second, lambda _: True))
+        for _ in range(100):
+            if len(store.rows('SELECT id FROM browser_reads')) == len(SOURCES):
+                break
+            await asyncio.sleep(0.01)
+        assert len(store.rows('SELECT id FROM browser_reads')) == len(SOURCES)
+        seen = []
+        for source in SOURCES[1:]:
+            action = reads.next_action()
+            seen.append(action['source'])
+            assert action['source'] == source
+            reads.receive(action['id'], {'state': 'ready', 'account': 'kkplayit', 'records': []})
+        return seen, await pending
+
+    seen, result = asyncio.run(scenario())
+    assert 'own' not in seen
+    assert result['complete']
+    assert store.rows("SELECT status FROM browser_reads WHERE task_id=? AND source='own'", (ident,))[0]['status'] == 'done'
+
+
+def test_legacy_round_timeout_reports_each_unfinished_source(tmp_path, monkeypatch):
+    class SlowClient:
+        async def user(self): return SimpleNamespace(id='1', screen_name='kkplayit')
+        async def get_user_tweets(self, *args, **kwargs): return []
+        async def search_tweet(self, *args, **kwargs):
+            await asyncio.sleep(0.1)
+            return []
+        async def get_notifications(self, *args, **kwargs):
+            await asyncio.sleep(0.1)
+            return []
+        async def get_latest_timeline(self, *args, **kwargs):
+            await asyncio.sleep(0.1)
+            return []
+
+    wait_for = asyncio.wait_for
+
+    async def fast_outer_timeout(coro, timeout):
+        return await wait_for(coro, timeout=0.01 if timeout == 40 else timeout)
+
+    monkeypatch.setattr('studio.xreader.asyncio.wait_for', fast_outer_timeout)
+    result = asyncio.run(XReader(Secrets(tmp_path), SlowClient()).sync('kkplayit'))
+    assert not result['complete']
+    assert set(result['sources']) == set(SOURCES)
+    assert result['sources']['own']['status'] == 'ok'
+    assert all(result['sources'][name]['status'] == 'timeout' for name in SOURCES[1:])
+
+
+def test_authenticated_extension_bridge_dispatches_browser_read(tmp_path):
+    app = create_app(tmp_path, 'http://testserver')
+    store = app.state.store
+    store.set('paused', False)
+    store.set('x_status', 'ready')
+    store.set('x_username', 'kkplayit')
+    token = 'fixture-device-token'
+    with store.db() as db:
+        db.execute('INSERT INTO sessions(token_hash,csrf,expires) VALUES(?,?,?)',
+                   (digest(token), 'fixture-csrf', int(time.time()) + 600))
+        db.execute('INSERT INTO desktop_tokens(token_hash,origin) VALUES(?,?)',
+                   (digest(token), CLOUD_ORIGIN))
+    ident = app.state.jobs.enqueue('sync')
+    app.state.jobs.claim()
+    with store.db() as db:
+        db.execute("INSERT INTO browser_reads(task_id,source,account,status,updated) VALUES(?,?,?,'queued',?)",
+                   (ident, 'own', 'kkplayit', int(time.time())))
+
+    with TestClient(app) as client:
+        with client.websocket_connect('/api/v1/persona-browser', headers={'origin': EXTENSION_ORIGIN}) as socket:
+            socket.send_json({'token': token, 'version': '1.3.5'})
+            action = socket.receive_json()['action']
+            assert action['kind'] == 'sync_read' and action['source'] == 'own'
+            socket.send_json({'type': 'result', 'id': action['id'], 'data': {
+                'state': 'ready', 'account': 'kkplayit', 'records': []}})
+            assert socket.receive_json()['action'] is None
+            assert store.get('browser_reads_preferred') is True
+    assert store.rows('SELECT status FROM browser_reads WHERE task_id=?', (ident,))[0]['status'] == 'done'
 
 
 def test_published_time_is_not_collection_time():
