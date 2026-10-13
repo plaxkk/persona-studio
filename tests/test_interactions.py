@@ -11,6 +11,7 @@ from studio.browser_identity import EXTENSION_ORIGIN
 from studio.desktop import CLOUD_ORIGIN
 from studio.interactions import reply_block
 from studio.security import digest
+from studio.xreader import ReadError
 
 
 @pytest.fixture
@@ -123,6 +124,24 @@ def test_browser_detail_stays_pending_if_parent_or_media_missing(client):
     assert post["text"] == "完整正文"
     assert post["review"]["context_status"] == "pending"
     assert client.post("/api/v1/drafts", json={"kind": "reply", "post_id": "8001", "text": "不能发"}).status_code == 409
+
+
+def test_context_task_fails_when_x_detail_never_loads(client):
+    store = client.app.state.store
+    store.set("x_username", "owner")
+    add_post(store, 8401, context={"detail_checked": False})
+    now = int(time.time())
+    with store.db(True) as db:
+        db.execute("INSERT INTO persona_browser_presence VALUES(1,'1.3.7',?)", (now,))
+        db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) VALUES(?,?,?,?,?,?,?)",
+                   ("context-unavailable", "context", '{"post_ids":["8401"]}', "running", now, now, now))
+        db.execute("INSERT INTO interaction_context_reads(task_id,post_id,author,account,status,result,updated) VALUES(?,?,?,?,?,?,?)",
+                   ("context-unavailable", "8401", "someone", "owner", "done", '{"state":"waiting_browser"}', now))
+    with pytest.raises(ReadError) as error:
+        asyncio.run(BrowserReads(store).enrich(
+            {"id": "context-unavailable", "payload": {"post_ids": ["8401"]}}, lambda _: True))
+    assert error.value.code == "context_unavailable"
+    assert not json.loads(store.rows("SELECT context FROM posts WHERE id='8401'")[0]["context"]).get("detail_checked")
 
 
 def test_extension_bridge_dispatches_context_id(client):
