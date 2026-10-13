@@ -47,6 +47,17 @@ def test_page_search_past_200_and_topic_count(client):
     assert client.get("/api/v1/interactions/page?limit=1000").status_code == 422
 
 
+def test_daily_recommendations_do_not_fill_with_unrelated_timeline_posts(client):
+    store = client.app.state.store
+    for ident in range(1300, 1340):
+        add_post(store, ident, text="今天天气不错")
+    add_post(store, 1400, text="Codex 多轮对话怎么保存？")
+    add_post(store, 1401, text="谢谢你", context={"source": "replies"})
+    recommended = client.get("/api/v1/interactions/page?view=recommended").json()
+    assert {row["id"] for row in recommended["items"]} == {"1400", "1401"}
+    assert recommended["total"] == 2
+
+
 def test_context_gate_skills_and_review(client):
     store = client.app.state.store
     add_post(store, 6001, context={"detail_checked": False, "parent_needed": True})
