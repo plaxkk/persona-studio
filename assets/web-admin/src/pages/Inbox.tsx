@@ -72,7 +72,7 @@ export default function Inbox({
                   } as Record<string, string>
                 )[s.name] || s.name}
                 ：{label(s.status)} · 最近成功 {time(s.last_success)} ·{" "}
-                {s.count} 条
+                本次新增 {s.count} 条 · 最近尝试 {time(s.last_attempt)}
               </p>
             ))}
           </div>
@@ -112,7 +112,7 @@ export default function Inbox({
                   <div>
                     <strong>@{post.author}</strong>
                     <p>
-                      {kinds[post.kind] || "互动"} · {time(post.created)}
+                      {kinds[post.kind] || "互动"} · 发布：{post.context.published_at ? time(post.context.published_at) : "时间未知"} · 采集：{time(post.created)}
                     </p>
                   </div>
                   <Badge>{label(post.status)}</Badge>

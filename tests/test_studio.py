@@ -656,6 +656,7 @@ def test_x_errors_distinguish_compatibility_network_and_login():
     assert classify(httpx.ConnectError("private details")) == "network_error"
     assert classify(httpx.ReadTimeout("private details")) == "timeout"
     assert classify(type("Unauthorized", (Exception,), {})()) == "needs_login"
+    assert classify(type("Forbidden", (Exception,), {})()) == "access_restricted"
 
 
 def test_x_optional_profile_field_normalization():

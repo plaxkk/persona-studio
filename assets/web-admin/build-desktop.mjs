@@ -8,6 +8,7 @@ const names = [
   "background.js",
   "desktop.js",
   "persona-browser.js",
+  "sync-browser.js",
   "persona-page.js",
   "popup.js",
   "popup.html",

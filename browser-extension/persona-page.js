@@ -25,6 +25,16 @@ export async function readPersonaPage(action, expected) {
     return { state: "account_mismatch", account };
   if (!primary) return { state: "waiting_browser" };
   if (action.kind === "identity") return { state: "ready", account };
+  if (action.kind === "sync_snapshot" && /Something went wrong|Try reloading|出了点问题|重新加载/.test(primary.innerText))
+    return { state: "source_error" };
+  if (action.kind === "sync_snapshot" && primary.querySelector('[role="progressbar"]'))
+    return { state: "waiting_browser" };
+  if (action.kind === "sync_snapshot" && !primary.querySelector('article[data-testid="tweet"]')) {
+    // A still-loading timeline must never be reported as a successful empty read.
+    const empty = primary.querySelector('[data-testid="emptyState"]');
+    const emptyMessage = /No results for|No results found|No posts yet|没有找到结果|暂无帖子/.test(primary.innerText);
+    if (!empty && !emptyMessage) return { state: "waiting_browser" };
+  }
   const prior = globalThis.__personaTargets;
   if (["expand", "original", "detail"].includes(action.kind)) {
     const t = prior?.targets?.get(action.target);
@@ -77,7 +87,8 @@ export async function readPersonaPage(action, expected) {
     if (!match) continue;
     const author = match[1],
       id = match[2];
-    if (author.toLowerCase() !== account.toLowerCase()) continue;
+    if (action.kind !== "sync_snapshot" && author.toLowerCase() !== account.toLowerCase()) continue;
+    if (action.kind === "sync_snapshot" && action.source === "own" && author.toLowerCase() !== account.toLowerCase()) continue;
     const textEl = article.querySelector('[data-testid="tweetText"]');
     // Quoted tweet text is not the author's commentary. Only text before first
     // nested quoted card is eligible; quote/context is stored separately.
@@ -113,6 +124,7 @@ export async function readPersonaPage(action, expected) {
       created_at: time.dateTime,
       context: quote?.innerText?.slice(0, 4000) || "",
       truncated: !!truncated,
+      media_pending: !!article.querySelector('[data-testid="tweetPhoto"],video'),
       translated:
         !!original || /Translated from|翻译自|由.*翻译/.test(article.innerText),
       repost: /reposted|转帖|转推/.test(social),
@@ -142,6 +154,11 @@ export async function readPersonaPage(action, expected) {
         url: "https://x.com/" + expected,
       }
     : undefined;
+  if (action.kind === "sync_snapshot") return {
+    state: "ready", account, page: location.pathname + location.search,
+    selected_tab: primary.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() || "",
+    records: records.slice(0, 30),
+  };
   return {
     state: "ready",
     account,

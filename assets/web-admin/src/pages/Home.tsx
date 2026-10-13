@@ -22,7 +22,7 @@ export default function Home({
   const complete =
     o.persona.name !== "未命名的角色" &&
     engine?.status === "ready" &&
-    data.connections.x.status === "ready";
+    Boolean(data.connections.x.verified_at);
   return (
     <>
       <Heading
@@ -42,7 +42,7 @@ export default function Home({
         </div>
         <div>
           <strong>
-            {s.paused ? "角色正在休息" : "正在收集互动与准备草稿"}
+            {s.paused ? "同步与自动生成已暂停" : !o.worker_alive ? "后台服务离线" : "后台服务运行中"}
           </strong>
           <p>
             {s.paused
@@ -66,6 +66,7 @@ export default function Home({
           后台任务服务尚未就绪。已保存的内容可继续编辑，生成与同步暂时无法执行。
         </div>
       )}
+      {o.sync?.stale && <div className="notice warning">部分互动来源尚未成功读取，或已超过两个同步周期未更新。请查看下方读取结果。</div>}
       <div className="metrics">
         <button onClick={() => actions.navigate("inbox")}>
           <span>新互动</span>
@@ -109,7 +110,7 @@ export default function Home({
           <Step
             done={engine?.status === "ready"}
             title="选择写作引擎"
-            description="OpenClaw 或 Hermes，可随时切换。"
+            description="Codex、OpenClaw 或 Hermes，可随时切换。"
             onClick={() => actions.navigate("settings")}
           />
           <Step
@@ -155,7 +156,8 @@ export default function Home({
           <strong>X 互动同步</strong>
           <Badge>{label(s.x_status)}</Badge>
         </div>
-        <span>最近成功：{time(s.last_sync)}</span>
+        <span>最近有来源更新：{time(s.last_sync)}</span>
+        {o.sync && <><span>全部来源成功：{time(o.sync.last_complete)}</span><span>最近尝试：{o.sync.latest ? `${time(o.sync.latest.updated)} · ${label(o.sync.latest.status)}${o.sync.latest.error ? ` · ${label(o.sync.latest.error)}` : ""}` : "尚未尝试"}</span></>}
         <span>
           {s.paused
             ? "恢复后再同步"

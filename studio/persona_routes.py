@@ -10,6 +10,7 @@ from .codex_persona import preflight
 from .browser_identity import EXTENSION_ORIGIN
 from .desktop import CLOUD_ORIGIN
 from .security import digest
+from .browser_reads import BrowserReads
 
 
 class Create(BaseModel):
@@ -26,6 +27,7 @@ class Apply(BaseModel):
 
 def register(app, store, session, allowed_hosts):
     imports = PersonaImports(store)
+    reads = BrowserReads(store)
     app.state.persona_imports = imports
     auth = [Depends(session)]
 
@@ -134,13 +136,19 @@ def register(app, store, session, allowed_hosts):
                     await ws.close(code=1008)
                     break
                 imports.presence(str(hello.get("version", "")))
-                action = imports.next_action()
+                if reads.connected():
+                    store.set("browser_reads_preferred", True)
+                action = imports.next_action() or reads.next_action()
                 await ws.send_json({"action": action})
                 msg = await asyncio.wait_for(ws.receive_json(), 40)
                 if len(json.dumps(msg)) > 950000:
                     await ws.close(code=1009)
                     break
                 if msg.get("type") == "result":
+                    if action and action.get('transport') == 'sync':
+                        if int(msg.get('id', -1)) == action['id']:
+                            reads.receive(action['id'], msg.get('data'))
+                        continue
                     imports.receive(
                         int(msg["id"]),
                         str(msg["import_id"]),

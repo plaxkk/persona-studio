@@ -92,6 +92,8 @@ def test_shadow_tick_generates_pending_without_live(client,monkeypatch):
     def run(cmd,**kwargs):
         if any(str(x).endswith('hermes_worker.py') for x in cmd):
             return subprocess.CompletedProcess(cmd,0,json.dumps({'reply':'有些界面少一个按钮，反而更容易用。'}),'')
+        if any(str(x).endswith('check_reply.py') for x in cmd):
+            return subprocess.CompletedProcess(cmd,0,json.dumps({'ok':True}),'')
         return original(cmd,**kwargs)
     monkeypatch.setattr(tick.subprocess,'run',run)
     tick.main()

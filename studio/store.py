@@ -20,6 +20,7 @@ DEFAULTS = dict(
     x_status="not_connected",
     x_verified_at=0,
     last_sync=0,
+    last_complete_sync=0,
     last_sync_requested=0,
     auto_replies=12,
     auto_posts=2,
@@ -88,6 +89,8 @@ class Store:
             CREATE TABLE IF NOT EXISTS telegram_updates(id INTEGER PRIMARY KEY,created INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS notices(draft_id TEXT PRIMARY KEY,status TEXT NOT NULL,created INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS creations(id TEXT PRIMARY KEY,idea TEXT NOT NULL,candidate TEXT NOT NULL DEFAULT '',stage TEXT NOT NULL DEFAULT 'idea',version INTEGER NOT NULL DEFAULT 1,task_id TEXT,draft_id TEXT REFERENCES drafts(id),created INTEGER NOT NULL,updated INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS persona_browser_presence(id INTEGER PRIMARY KEY CHECK(id=1),version TEXT NOT NULL,seen INTEGER NOT NULL);
+            CREATE TABLE IF NOT EXISTS browser_reads(id INTEGER PRIMARY KEY,task_id TEXT NOT NULL,source TEXT NOT NULL,account TEXT NOT NULL,status TEXT NOT NULL,result TEXT NOT NULL DEFAULT '{}',updated INTEGER NOT NULL,UNIQUE(task_id,source));
             """)
             for k, v in DEFAULTS.items():
                 c.execute(
@@ -108,6 +111,9 @@ class Store:
                 )
             c.execute(
                 "INSERT OR IGNORE INTO migrations VALUES(1,?)", (int(time.time()),)
+            )
+            c.execute(
+                "INSERT OR IGNORE INTO migrations VALUES(2,?)", (int(time.time()),)
             )
         self.path.chmod(0o600)
 

@@ -9,6 +9,8 @@ from .engines import Engines, EngineRequest, EngineError
 from .security import Secrets, sanitize
 from .xreader import XReader, ReadError
 from .inspiration import collect_work
+from .sync_status import failed as sync_failed
+from .browser_reads import BrowserReads
 
 
 class JobError(Exception):
@@ -211,25 +213,19 @@ class Jobs:
     async def sync(self, job):
         reader = XReader(self.secrets)
         try:
-            result = await reader.sync(self.store.get("x_username"))
+            browser = BrowserReads(self.store)
+            # The signed-in browser remains the primary reader when connected.
+            # Older connectors retain the existing read-only API path.
+            use_browser = self.store.get("browser_reads_preferred", False) or browser.connected()
+            result = await browser.sync(job, self.alive) if use_browser else await reader.sync(self.store.get("x_username"))
         finally:
             await reader.close()
         if not self.alive(job):
             raise EngineError("cancelled")
         now = int(time.time())
         new = []
+        added_counts = {name: 0 for name in result['sources']}
         with self.store.db(True) as c:
-            for name, source in result["sources"].items():
-                c.execute(
-                    "INSERT INTO sources(name,status,last_success,last_attempt,count) VALUES(?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET status=excluded.status,last_success=CASE WHEN excluded.status='ok' THEN excluded.last_success ELSE sources.last_success END,last_attempt=excluded.last_attempt,count=excluded.count",
-                    (
-                        name,
-                        source["status"],
-                        now if source["status"] == "ok" else 0,
-                        now,
-                        source["count"],
-                    ),
-                )
             for p in result["posts"]:
                 inserted = c.execute(
                     "INSERT OR IGNORE INTO posts VALUES(?,?,?,?,?,?,?,?,?,?)",
@@ -246,10 +242,22 @@ class Jobs:
                         now,
                     ),
                 ).rowcount
+                if inserted:
+                    source_name = p['context'].get('source')
+                    if source_name in added_counts:
+                        added_counts[source_name] += 1
                 if inserted and p["kind"] != "own" and p["status"] == "new":
                     new.append(p)
+            for name, source in result["sources"].items():
+                c.execute(
+                    "INSERT INTO sources(name,status,last_success,last_attempt,count) VALUES(?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET status=excluded.status,last_success=CASE WHEN excluded.status='ok' THEN excluded.last_success ELSE sources.last_success END,last_attempt=excluded.last_attempt,count=excluded.count",
+                    (name, source["status"], now if source["status"] == "ok" else 0,
+                     now, added_counts[name]),
+                )
             if any(s["status"] == "ok" for s in result["sources"].values()):
                 self.store.set("last_sync", now, c)
+            if result["complete"]:
+                self.store.set("last_complete_sync", now, c)
             self.store.set("x_status", "ready" if result["complete"] else "partial", c)
             self.store.event(
                 "sync",
@@ -264,6 +272,10 @@ class Jobs:
             ),
         )
         for p in ordered[: self.store.get("per_round")]:
+            # Browser snapshots may omit a parent, quoted post or media. These
+            # records are available for review but need enrichment before drafting.
+            if p['context'].get('reader') == 'browser':
+                continue
             try:
                 self.enqueue(
                     "reply",
@@ -547,7 +559,8 @@ class Jobs:
             self.finish(job, "succeeded", result)
         except (ReadError, EngineError, JobError) as exc:
             code = exc.code
-            if isinstance(exc, ReadError):
+            if isinstance(exc, ReadError) and code != 'cancelled':
+                sync_failed(self.store, code)
                 self.store.set(
                     "x_status",
                     code if code in ["needs_login", "rate_limited"] else "partial",
@@ -555,14 +568,14 @@ class Jobs:
                 if code == "needs_login":
                     self.store.set("paused", True)
                 if (
-                    code in ["timeout", "source_error"]
-                    and job["attempts"] < 1
+                    code in ["timeout", "source_error", "network_error", "rate_limited"]
+                    and job["attempts"] < 2
                     and self.alive(job)
                 ):
                     with self.store.db(True) as c:
                         c.execute(
                             "UPDATE tasks SET status='queued',available=?,error=? WHERE id=?",
-                            (int(time.time()) + 30, code, job["id"]),
+                            (int(time.time()) + (300 if code == "rate_limited" else 30) * 2 ** job["attempts"], code, job["id"]),
                         )
                     return
             if job["kind"] == "probe":
@@ -575,4 +588,7 @@ class Jobs:
                 job, "cancelled" if code == "cancelled" else "failed", error=code
             )
         except Exception:
+            if job["kind"] == "sync":
+                sync_failed(self.store, "source_error")
+                self.store.set("x_status", "partial")
             self.finish(job, "failed", error="internal_error")

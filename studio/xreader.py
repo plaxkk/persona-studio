@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from email.utils import parsedate_to_datetime
 from .security import Secrets, sanitize
 from .safety import skip_source
 from .twikit_compat import CompatibleClient, XCompatibilityError
@@ -20,6 +21,14 @@ def classify(exc):
     name = type(exc).__name__.lower()
     if isinstance(exc, XCompatibilityError):
         return "client_incompatible"
+    if isinstance(exc, httpx.HTTPStatusError):
+        if exc.response.status_code == 401:
+            return "needs_login"
+        if exc.response.status_code == 403:
+            return "access_restricted"
+        if exc.response.status_code == 429:
+            return "rate_limited"
+        return "source_error"
     if isinstance(exc, httpx.TimeoutException):
         return "timeout"
     if isinstance(exc, httpx.TransportError):
@@ -28,8 +37,12 @@ def classify(exc):
         return "client_incompatible"
     if name == "notfound":
         return "client_incompatible"
-    if any(x in name for x in ["unauthor", "forbidden", "account", "badrequest"]):
+    if "unauthor" in name:
         return "needs_login"
+    if any(x in name for x in ["forbidden", "account"]):
+        return "access_restricted"
+    if "badrequest" in name:
+        return "source_error"
     if "toomany" in name or "ratelimit" in name:
         return "rate_limited"
     if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
@@ -43,6 +56,14 @@ def get(value, key, default=None):
         if isinstance(value, dict)
         else getattr(value, key, default)
     )
+
+
+def published_time(tweet):
+    value = get(tweet, "created_at")
+    try:
+        return int(parsedate_to_datetime(value).timestamp()) if value else None
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def tweet_row(tweet, source, username, own_ids=()):
@@ -62,6 +83,7 @@ def tweet_row(tweet, source, username, own_ids=()):
     parent = get(tweet, "in_reply_to") or get(tweet, "in_reply_to_status_id")
     context = {
         "source": source,
+        "published_at": published_time(tweet),
         "parent_id": str(parent or ""),
         "quote": {
             "id": str(get(quote, "id") or ""),

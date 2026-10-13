@@ -71,6 +71,7 @@ export type Overview = {
   persona: Persona;
   engines: Engine[];
   worker_alive: boolean;
+  sync?: {stale: boolean; last_complete: number; latest: {status: string; error: string; updated: number} | null; sources: Source[]};
   counts: { new: number; drafts: number; confirmed: number };
   tasks: Task[];
   events: Activity[];
@@ -96,6 +97,7 @@ export type Post = {
     quote?: { text: string; id: string };
     suggestion?: string;
     source?: string;
+    published_at?: number | null;
   };
   created: number;
 };

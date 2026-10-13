@@ -435,7 +435,7 @@ export default function App() {
             />
             {data?.overview.settings.paused
               ? "同步与生成已暂停"
-              : "正在准备内容"}
+              : !data?.overview.worker_alive ? "后台服务离线" : "后台服务运行中"}
           </span>
         </div>
         {data && !desktopMode && (

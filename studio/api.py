@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .sync_status import summary as sync_summary
 import asyncio
 import json
 import os
@@ -44,6 +45,8 @@ ERRORS = {
     "refresh_cooldown": "刷新较频繁，请至少间隔 60 秒。",
     "daily_budget": "已达到今天的自动生成预算。",
     "needs_login": "X 登录已失效或需要验证，请重新提供凭据。",
+    "browser_offline": "连接助手未在线，请打开 Chrome 并检查本机连接。",
+    "access_restricted": "X 要求额外验证，完成后再重试读取。",
     "identity_mismatch": "实际登录的 X 账号与填写的用户名不一致。",
     "rate_limited": "X 暂时限制了读取频率，稍后会再试。",
     "timeout": "连接超时，请稍后重试。",
@@ -458,12 +461,14 @@ def create_app(state_dir=None, public_url=None):
     def overview():
         cfg = store.settings()
         now = int(time.time())
+        health = sync_summary(store, now)
         return {
             "settings": cfg,
             "persona": store.get("persona"),
             "engines": engines.list(),
             "worker_alive": now - cfg["worker_heartbeat"] < 30,
-            "sources": store.rows("SELECT * FROM sources"),
+            "sync": health,
+            "sources": health['sources'],
             "counts": {
                 "new": store.rows(
                     "SELECT count(*) AS n FROM posts WHERE status='new' AND kind!='own'"
@@ -1018,7 +1023,7 @@ def create_app(state_dir=None, public_url=None):
             "x_status": store.get("x_status"),
             "telegram_status": store.get("telegram_status"),
             "sources": store.rows("SELECT * FROM sources"),
-            "schema_version": 1,
+            "schema_version": store.rows("SELECT max(version) AS version FROM migrations")[0]["version"],
             "live_x_writes": False,
             "intent_prefill_verified": False,
         }
