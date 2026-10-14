@@ -76,6 +76,23 @@ test('growth and publication metrics routes stay scoped to the local bridge',()=
  assert.equal(allowedRoute('/growth/goal','GET'),false);
  assert.equal(allowedRoute('/drafts/'+id+'/metrics/export','POST'),false);
 });
+test('weekly report routes pass through the extension and nothing wider does',()=>{
+ const id='w20261013-kkplayit';
+ for (const [path,method] of [['/reports/weekly','GET'],['/reports/weekly/generate','POST'],['/reports/weekly/'+id,'GET']]) {
+  assert.equal(allowedRoute(path,method),true,path+' '+method);
+  assert.equal(isUpgradeRelatedRoute(path),true,path);
+ }
+ for (const [path,method] of [
+  ['/reports','GET'],['/reports/weekly','POST'],
+  ['/reports/weekly/'+id,'POST'],['/reports/weekly/'+id,'DELETE'],
+  ['/reports/weekly/'+id+'/../settings','GET'],['/reports/weekly/a b','GET'],
+  ['/reports/weekly?a=1','GET']
+ ]) assert.equal(allowedRoute(path,method),false,path+' '+method);
+ // The read pattern accepts any id, so this GET is routed — but it can only ask
+ // for a report named "generate", and generating is POST-only.
+ assert.equal(allowedRoute('/reports/weekly/generate','GET'),true);
+ assert.equal(allowedRoute('/reports/weekly/generate','POST'),true);
+});
 test('Subscription analytics read routes are specific and credentials stay local',()=>{
  assert.equal(allowedRoute('/analytics/content','GET'),true);
  assert.equal(allowedRoute('/analytics/content/read','POST'),true);

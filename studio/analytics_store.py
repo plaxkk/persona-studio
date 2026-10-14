@@ -8,7 +8,7 @@ import re
 from .subscription_analytics import AnalyticsShapeError, parse_content_page
 
 
-PARSER_VERSION = 1
+PARSER_VERSION = 2
 MAX_RAW_BYTES = 8_000_000
 
 
@@ -49,9 +49,12 @@ def record_content_page(store, *, run_id: str, account: str, payload: dict,
                        "observed_at,request_limit,received_count,parsed_count,gap_count,"
                        "at_request_limit,parser_version,raw_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
                        (run_id, *metadata))
-            db.executemany("INSERT INTO analytics_post_metrics VALUES(?,?,?,?,?)", [
+            db.executemany("INSERT INTO analytics_post_metrics"
+                           "(run_id,post_id,published_at_ms,text,metrics_json,kind) "
+                           "VALUES(?,?,?,?,?,?)", [
                 (run_id, item["post_id"], item["created_at_ms"], item["text"],
-                 json.dumps(item["metrics"], ensure_ascii=False, separators=(",", ":")))
+                 json.dumps(item["metrics"], ensure_ascii=False, separators=(",", ":")),
+                 item["kind"])
                 for item in parsed["posts"]
             ])
             db.executemany("INSERT INTO analytics_coverage_gaps VALUES(?,?,?,?)", [

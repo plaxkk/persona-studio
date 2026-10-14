@@ -197,6 +197,7 @@ export type Page =
   | "inbox"
   | "compose"
   | "history"
+  | "reports"
   | "settings";
 export type Actions = {
   refresh: () => Promise<void>;

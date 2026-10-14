@@ -1,5 +1,5 @@
 """Disposable desktop website regression, simulated extension + model only."""
-import json, mimetypes, os, tempfile, time
+import json, mimetypes, os, re, tempfile, time
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi.testclient import TestClient
@@ -9,6 +9,10 @@ from studio.desktop import desktop_route
 from studio import codex_persona
 
 ROOT=Path(__file__).resolve().parents[1]
+# The release version decides both which extensions count as out of date and the
+# text of the guide, so the fixture reads it instead of carrying its own copy.
+RELEASE=re.search(r'EXTENSION_VERSION = "([\d.]+)"',
+  (ROOT/'assets/web-admin/src/extension-info.ts').read_text()).group(1)
 ORIGIN='https://persona-studio-plaxkk.vercel.app'
 codex_persona.preflight=lambda:dict(installed=True,ready=True,model='fixture',reasoning='medium',message='模拟登录')
 with tempfile.TemporaryDirectory() as tmp:
@@ -51,12 +55,12 @@ with tempfile.TemporaryDirectory() as tmp:
    card=page.locator('article.engine-card').filter(has=page.get_by_role('heading',name='Codex',exact=True))
    card.get_by_role('button',name='测试连接',exact=True).click()
    expect(page.get_by_role('heading',name='安装 / 更新连接助手',exact=True)).to_be_visible()
-   expect(page.get_by_text('连接助手需要更新至 1.3.13。',exact=False)).to_be_visible()
+   expect(page.get_by_text(f'连接助手需要更新至 {RELEASE}。',exact=False)).to_be_visible()
    assert not any(path=='/engines/codex/verify' for _,path in requests)
    page.screenshot(path='/private/tmp/extension-upgrade-desktop.png',full_page=True)
-   version[0]='1.3.13'
+   version[0]=RELEASE
    page.get_by_role('button',name='我已更新，重新检测').click()
-   expect(page.get_by_text('当前版本：1.3.13',exact=False)).to_be_visible()
+   expect(page.get_by_text(f'当前版本：{RELEASE}',exact=False)).to_be_visible()
    page.get_by_role('button',name='关闭更新指南').click()
    card.get_by_role('button',name='测试连接',exact=True).click()
    expect(page.get_by_text('已开始 Codex 真实连接测试',exact=True)).to_be_visible()

@@ -47,6 +47,19 @@ def _metrics(values: object) -> dict[str, int | float | None] | None:
     return metrics
 
 
+def _kind(result: dict) -> str:
+    """Classify a post as a reply only when the response proves it is one.
+
+    `reply_to_results` holds the parent post (`{"id", "rest_id"}`) and is absent
+    or null for everything else — measured on 815 stored items, where it agreed
+    with the leading-`@` pattern 805 times. There is no original/quote marker in
+    this payload, so a non-reply is recorded as `post` without claiming it is an
+    original; the weekly report lists that gap instead of guessing.
+    """
+    parent = result.get("reply_to_results")
+    return "reply" if isinstance(parent, dict) and parent else "post"
+
+
 def parse_content_page(payload: dict, *, from_time: str, to_time: str,
                        max_results: int, observed_at: int) -> dict:
     """Return posts and explicit gaps for one Content query window.
@@ -81,7 +94,8 @@ def parse_content_page(payload: dict, *, from_time: str, to_time: str,
                     and isinstance(details.get("full_text"), str)
                     and details["full_text"].strip() and metrics is not None):
                 posts.append({"post_id": post_id, "created_at_ms": details["created_at_ms"],
-                              "text": details["full_text"], "metrics": metrics})
+                              "text": details["full_text"], "metrics": metrics,
+                              "kind": _kind(result)})
                 seen_ids.add(post_id)
                 continue
             else:

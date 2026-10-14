@@ -289,6 +289,62 @@ class Store:
                     ON creation_media(creation_id,created);
                 """)
                 c.execute("INSERT INTO migrations VALUES(9,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=10").fetchone():
+                # `kind` separates replies from everything else. It is nullable:
+                # rows staged before this migration were never classified, and a
+                # NULL is honest about that where 'post' would be a claim.
+                c.execute("ALTER TABLE analytics_post_metrics ADD COLUMN kind TEXT")
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS weekly_reports(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL,
+                    week_start TEXT NOT NULL, week_end TEXT NOT NULL,
+                    timezone TEXT NOT NULL, from_ms INTEGER NOT NULL,
+                    to_ms INTEGER NOT NULL, generated_at INTEGER NOT NULL,
+                    data_quality TEXT NOT NULL, facts_json TEXT NOT NULL,
+                    report_json TEXT NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER,
+                    UNIQUE(account,week_start));
+                CREATE INDEX IF NOT EXISTS weekly_report_pending
+                    ON weekly_reports(cloud_status,cloud_retry_at,generated_at);
+                CREATE TABLE IF NOT EXISTS weekly_report_issues(
+                    report_id TEXT NOT NULL REFERENCES weekly_reports(id),
+                    ordinal INTEGER NOT NULL, code TEXT NOT NULL,
+                    title TEXT NOT NULL, evidence TEXT NOT NULL,
+                    benchmark TEXT NOT NULL DEFAULT '',
+                    hypothesis TEXT NOT NULL DEFAULT '',
+                    alternative TEXT NOT NULL DEFAULT '',
+                    action TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL,
+                    PRIMARY KEY(report_id,ordinal));
+                -- The 14-day experiment ledger lands with the report that has to
+                -- read it ("上周尝试的结果"), so an empty table can say 暂无数据
+                -- instead of the report pretending the question does not exist.
+                -- The five cloud_* columns are in place for the Supabase mirror;
+                -- no pusher writes them yet.
+                CREATE TABLE IF NOT EXISTS experiments(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL,
+                    hypothesis TEXT NOT NULL, metric TEXT NOT NULL,
+                    baseline_json TEXT NOT NULL DEFAULT '{}',
+                    target_json TEXT NOT NULL DEFAULT '{}',
+                    started_at INTEGER NOT NULL, planned_end_at INTEGER NOT NULL,
+                    ended_at INTEGER, status TEXT NOT NULL,
+                    result_json TEXT NOT NULL DEFAULT '{}',
+                    decision TEXT NOT NULL DEFAULT '',
+                    created INTEGER NOT NULL, updated INTEGER NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE TABLE IF NOT EXISTS experiment_observations(
+                    experiment_id TEXT NOT NULL REFERENCES experiments(id),
+                    day TEXT NOT NULL, metric TEXT NOT NULL, value REAL,
+                    known INTEGER NOT NULL, source TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL,
+                    PRIMARY KEY(experiment_id,day,metric,source));
+                """)
+                c.execute("INSERT INTO migrations VALUES(10,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

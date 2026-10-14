@@ -19,5 +19,6 @@ export function isUpgradeRelatedRoute(path: string) {
     || /^\/analytics\/content(?:\/|$)/.test(path)
     || /^\/analytics\/overview(?:\/|$)/.test(path)
     || /^\/drafts\/[a-f0-9-]+\/metrics(?:\/|$)/.test(path)
+    || /^\/reports\/weekly(?:\/|$)/.test(path)
   );
 }

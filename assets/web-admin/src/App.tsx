@@ -6,6 +6,7 @@ import {
   PenLine,
   Library,
   Settings,
+  ClipboardCheck,
   LogOut,
   Menu,
   X,
@@ -36,6 +37,7 @@ import PersonaPage from "./pages/PersonaPage";
 import InboxPage from "./pages/Inbox";
 import Compose from "./pages/Compose";
 import History from "./pages/History";
+import WeeklyReport from "./pages/WeeklyReport";
 import { BrowserConnection } from "./components/BrowserConnection";
 import SettingsPage from "./pages/SettingsPage";
 const nav: { id: Page; label: string; icon: typeof House }[] = [
@@ -44,6 +46,7 @@ const nav: { id: Page; label: string; icon: typeof House }[] = [
   { id: "inbox", label: "互动收件箱", icon: Inbox },
   { id: "compose", label: "写推文", icon: PenLine },
   { id: "history", label: "内容库", icon: Library },
+  { id: "reports", label: "每周诊断", icon: ClipboardCheck },
   { id: "settings", label: "设置", icon: Settings },
 ];
 export default function App() {
@@ -454,6 +457,8 @@ export default function App() {
               <Compose data={data} actions={actions} />
             ) : page === "history" ? (
               <History data={data} actions={actions} />
+            ) : page === "reports" ? (
+              <WeeklyReport data={data} actions={actions} />
             ) : (
               <SettingsPage data={data} actions={actions} />
             )}

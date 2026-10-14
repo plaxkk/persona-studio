@@ -3,7 +3,7 @@ import asyncio
 import json
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from .engines import Engines, EngineRequest, EngineError
 from .security import Secrets, sanitize
@@ -13,6 +13,8 @@ from .sync_status import failed as sync_failed
 from .browser_reads import BrowserReads
 from .analytics_browser_reads import AnalyticsBrowserReads
 from .interactions import candidate_ids, reply_block
+from .weekly import generate as generate_weekly, last_complete_week
+from .weekly import timezone as weekly_timezone
 
 
 class JobError(Exception):
@@ -38,7 +40,9 @@ class Jobs:
                 r["key"]: json.loads(r["value"])
                 for r in c.execute("SELECT * FROM settings")
             }
-            if cfg["paused"] and kind not in ["chat", "probe"]:
+            # A weekly report only reads local rows; pausing stops outward
+            # actions, not the diagnosis the user asked for by hand.
+            if cfg["paused"] and kind not in ["chat", "probe", "weekly"]:
                 raise JobError("paused")
             if dedupe:
                 old = c.execute(
@@ -124,7 +128,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview") else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview", "weekly") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -138,7 +142,7 @@ class Jobs:
                 c.execute("SELECT value FROM settings WHERE key='paused'").fetchone()[0]
             )
             row = c.execute(
-                "SELECT * FROM tasks WHERE status='queued' AND cancel=0 AND available<=? AND (?=0 OR kind IN ('chat','probe')) ORDER BY created,id LIMIT 1",
+                "SELECT * FROM tasks WHERE status='queued' AND cancel=0 AND available<=? AND (?=0 OR kind IN ('chat','probe','weekly')) ORDER BY created,id LIMIT 1",
                 (int(time.time()), int(paused)),
             ).fetchone()
             if not row:
@@ -156,7 +160,7 @@ class Jobs:
         return bool(
             rows
             and not rows[0]["cancel"]
-            and (job["kind"] in ["chat", "probe"] or not self.store.get("paused"))
+            and (job["kind"] in ["chat", "probe", "weekly"] or not self.store.get("paused"))
         )
 
     def finish(self, job, status, result=None, error=""):
@@ -223,9 +227,12 @@ class Jobs:
 
     def schedule_measurements(self, now):
         browser = BrowserReads(self.store)
-        if not browser.connected(8): return
         account = self.store.get('x_username','')
         if not account: return
+        # The report is assembled from rows already on disk, so it does not need
+        # the browser and is not skipped when the connector is offline.
+        self.schedule_weekly(now, account)
+        if not browser.connected(8): return
         if browser.connected(11):
             # Refresh the most useful Analytics window once a day. A failed
             # browser read waits an hour before another automatic attempt.
@@ -371,6 +378,45 @@ class Jobs:
                 except JobError:
                     pass
         return {"new": len(new), "complete": result["complete"]}
+
+    def schedule_weekly(self, now, account):
+        """One report per finished week, on Monday morning.
+
+        Generating at Monday 00:00 would race the day's own content read, which
+        is what picks up Sunday evening; three hours of slack, then one retry a
+        day until the week rolls over. The dedupe key carries the week, so a
+        hand-made report and this one never both run.
+        """
+        # The same resolver the report itself uses, so the week this schedules is
+        # the week the report will name even if the setting is empty or invalid.
+        zone = weekly_timezone(self.store)
+        week = last_complete_week(int(now * 1000), zone)
+        ready = int((datetime.combine(week + timedelta(days=7), datetime.min.time(), zone)
+                     + timedelta(hours=3)).timestamp())
+        if now < ready:
+            return
+        key = 'weekly:' + week.isoformat()
+        latest = self.store.rows(
+            "SELECT status,created FROM tasks WHERE dedupe=? "
+            "ORDER BY created DESC,id DESC LIMIT 1", (key,))
+        last = latest[0] if latest else None
+        if last and (last['status'] in ('queued', 'running') or now - last['created'] < 86400):
+            return
+        try:
+            self.enqueue('weekly', {'week_start': week.isoformat()},
+                         automatic=True, dedupe=key)
+        except JobError:
+            pass
+
+    async def weekly(self, job):
+        """Assemble one weekly diagnosis page from rows already stored locally."""
+        account = str(self.store.get("x_username", "") or "")
+        if not account:
+            raise JobError("account_missing")
+        if not self.alive(job):
+            raise JobError("cancelled")
+        return generate_weekly(self.store, account=account,
+                               week_start=job["payload"].get("week_start") or None)
 
     async def generate(self, job):
         payload = job["payload"]
@@ -643,6 +689,7 @@ class Jobs:
                 BrowserReads(self.store).metric(job, self.alive) if job["kind"] == "metric" else
                 BrowserReads(self.store).profile(job, self.alive) if job["kind"] == "profile_metric" else
                 AnalyticsBrowserReads(self.store).read(job, self.alive) if job["kind"] in ("analytics_content", "analytics_overview") else
+                self.weekly(job) if job["kind"] == "weekly" else
                 self.generate(job)
             )
             self.finish(job, "succeeded", result)

@@ -4,6 +4,7 @@ import asyncio
 import mimetypes
 import json
 import os
+import re
 from studio.security import Secrets
 import shutil
 from deployment.install_browser_connector import install
@@ -138,7 +139,17 @@ async def main():
                 await expect(
                     web.get_by_text("已连接这台电脑", exact=True)
                 ).to_be_visible(timeout=15000)
-                await expect(web.get_by_role("link", name="下载连接助手 v1.3.13")).to_be_visible()
+                # Read the version the panel advertises from its own source, so a
+                # release bump cannot leave this assertion describing an older one.
+                advertised = re.search(
+                    r'EXTENSION_VERSION = "([\d.]+)"',
+                    Path("assets/web-admin/src/extension-info.ts").read_text(),
+                ).group(1)
+                downloaded = Path(".vercel-dist/downloads/persona-studio-browser.zip")
+                assert downloaded.is_file(), "桌面构建必须带上可下载的连接助手 ZIP"
+                await expect(
+                    web.get_by_role("link", name=f"下载连接助手 v{advertised}")
+                ).to_be_visible()
                 await web.get_by_role("button", name="安装 / 更新指南", exact=True).click()
                 await expect(web.get_by_role("region", name="连接助手安装与更新")).to_be_visible()
                 await web.get_by_role("button", name="关闭更新指南").click()

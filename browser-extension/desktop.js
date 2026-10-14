@@ -26,11 +26,11 @@ export function allowedRoute(path, method) {
   )
     return true;
   if (method === "GET")
-    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|growth|analytics\/(content|overview)|interactions(\/(page|skills))?|messages|creations(\/[a-f0-9]{32}(\/media(\/[a-f0-9]{32}\/chunks\/[0-9]+)?)?)?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/(versions|metrics))?|events|diagnostics)$/.test(
+    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|growth|analytics\/(content|overview)|interactions(\/(page|skills))?|messages|creations(\/[a-f0-9]{32}(\/media(\/[a-f0-9]{32}\/chunks\/[0-9]+)?)?)?|reports\/weekly(\/[a-z0-9_-]+)?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/(versions|metrics))?|events|diagnostics)$/.test(
       pathname,
     );
   if (method === "POST")
-    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|growth\/read|analytics\/(content\/(read|backfill)|overview\/read)|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize|media(\/[a-f0-9]{32}\/(chunks|complete))?))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive|metrics\/read))?|backup)$/.test(
+    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|growth\/read|analytics\/(content\/(read|backfill)|overview\/read)|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize|media(\/[a-f0-9]{32}\/(chunks|complete))?))?|reports\/weekly\/generate|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive|metrics\/read))?|backup)$/.test(
       pathname,
     );
   if (method === "DELETE")

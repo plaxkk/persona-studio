@@ -1394,6 +1394,8 @@ def create_app(state_dir=None, public_url=None):
     register(app, store, session, allowed_hosts)
     from .creation_routes import register as register_creations
     register_creations(app, store, jobs, session, vault)
+    from .report_routes import register as register_reports
+    register_reports(app, store, jobs, session)
 
     static = ROOT / "assets/web-admin/dist"
     if (static / "assets").exists():
