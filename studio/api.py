@@ -74,6 +74,20 @@ ERRORS = {
     "reply_author_limit": "今天已为这位作者准备两条新回复，继续交流请从已有对话进入。",
 }
 
+# The same policy is also declared in vercel.json for the hosted panel; browsers
+# apply both, so a route allowed in one and not the other is silently broken.
+# tests/test_content_security_policy.py fails if the two ever drift apart.
+#
+# img-src/media-src admit blob: because attachments are read back in chunks and
+# handed to <img>/<video> as object URLs — the panel never gets a URL it could
+# share. blob: is deliberately absent from script-src: an attachment must never
+# become executable.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; "
+    "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+)
+
 
 def fail(code, status=400):
     raise HTTPException(
@@ -331,9 +345,7 @@ def create_app(state_dir=None, public_url=None):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-        )
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response

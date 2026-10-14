@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.13','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.3.14','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -33,6 +33,28 @@ test('creation workflow routes pass through the extension',()=>{
   assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true);
  }
  assert.equal(allowedRoute('/creations/'+id+'/delete','POST'),false);
+});
+test('creation attachments pass through the extension while other sub-paths stay shut',()=>{
+ const id='a'.repeat(32),media='b'.repeat(32);
+ for (const [path,method] of [
+  ['/creations/'+id+'/media','GET'],['/creations/'+id+'/media','POST'],
+  ['/creations/'+id+'/media/'+media+'/chunks','POST'],
+  ['/creations/'+id+'/media/'+media+'/complete','POST'],
+  ['/creations/'+id+'/media/'+media+'/chunks/3','GET'],
+  ['/creations/'+id+'/media/'+media,'DELETE']
+ ]) {
+  assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true);
+ }
+ for (const [path,method] of [
+  ['/creations/'+id+'/media/'+media,'GET'],
+  ['/creations/'+id+'/media/'+media+'/chunks','GET'],
+  ['/creations/'+id+'/media/'+media+'/complete','GET'],
+  ['/creations/'+id+'/media/'+media+'/chunks/3','POST'],
+  ['/creations/'+id+'/media/'+media+'/chunks/3','DELETE'],
+  ['/creations/'+id+'/media/'+media+'/chunks?a=1','GET'],
+  ['/creations/'+id+'/media/'+media+'/chunks/-1','GET'],
+  ['/creations/'+id+'/media/'+media.toUpperCase()+'/chunks/0','GET']
+ ]) assert.equal(allowedRoute(path,method),false,path+' '+method);
 });
 test('interaction paging and review are scoped to the local bridge',()=>{
  assert.equal(allowedRoute('/interactions/page?view=all&offset=200&limit=25&q=%E6%97%85%E8%A1%8C','GET'),true);

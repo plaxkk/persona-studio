@@ -272,6 +272,23 @@ class Store:
                     PRIMARY KEY(run_id,series,item_index,metric_index,reason));
                 """)
                 c.execute("INSERT INTO migrations VALUES(8,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=9").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS creation_media(
+                    id TEXT PRIMARY KEY,
+                    creation_id TEXT NOT NULL REFERENCES creations(id),
+                    draft_id TEXT REFERENCES drafts(id),
+                    kind TEXT NOT NULL,
+                    filename TEXT NOT NULL DEFAULT '',
+                    mime TEXT NOT NULL,
+                    bytes INTEGER NOT NULL,
+                    sha256 TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    created INTEGER NOT NULL);
+                CREATE INDEX IF NOT EXISTS creation_media_owner
+                    ON creation_media(creation_id,created);
+                """)
+                c.execute("INSERT INTO migrations VALUES(9,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

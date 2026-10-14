@@ -4,6 +4,7 @@ import { api, time } from "../api";
 import { registerSave, flushDrafts } from "../pending";
 import type { Studio, Actions, Message } from "../types";
 import { Heading, Field, Button, Empty } from "../components/UI";
+import CreationMedia from "../components/CreationMedia";
 
 type Creation = { id: string; idea: string; candidate: string; stage: string; version: number; draft_id: string | null; final_text?: string; updated: number; messages: Message[]; task: {id: string; status: string; error: string; text: string} | null };
 const labels: Record<string, string> = {idea: "灵感暂存", writing: "正在打磨", final: "已定稿"};
@@ -126,6 +127,7 @@ function Workspace({id, data, actions, back}: {id:string; data:Studio; actions:A
       <aside className="surface creation-preview"><h2>{final?"最终稿":"候选稿"}</h2>
         {final ? <><p className="creation-final-text">{record.final_text ?? candidate}</p><Button tone="primary" onClick={()=>{sessionStorage.setItem("content-selected",record.draft_id!);actions.navigate("history");}}>到内容库查看定稿</Button></> : <><p className="muted">生成后在这里预览。也可以直接写，或把修改意见发给 AI。</p><Field label="推文正文"><textarea rows={12} value={candidate} maxLength={12000} disabled={disabled} onChange={e=>{setCandidate(e.target.value);setConfirming(false);}} placeholder="不必急着写完。先聊清楚，再让想法落成文字。"/></Field><small>{candidate.length} 字符 · {dirty?"有修改待保存":"已保存"}</small><div className="actions"><Button disabled={disabled||!dirty||!idea.trim()} onClick={()=>void perform(async()=>{await save();actions.notify("创作进度已保存");})}><Save size={16}/>保存进度</Button><Button tone="primary" disabled={disabled||!candidate.trim()||!idea.trim()} onClick={()=>setConfirming(true)}><Check size={16}/>确认定稿</Button></div>
         {confirming&&<div className="creation-confirm"><p>将当前正文保存为最终草稿，保留灵感和全部对话。不会自动发布到 X。</p><div className="actions"><Button disabled={busy} onClick={()=>setConfirming(false)}>再改改</Button><Button tone="primary" busy={busy} onClick={()=>void perform(async()=>{const r=await save();await api("/creations/"+id+"/finalize","POST",{version:r.version});await reload();await actions.refresh();setConfirming(false);})}>保存为最终稿</Button></div></div>}</>}
+        <CreationMedia creationId={id} actions={actions}/>
       </aside>
     </div>
   </>;

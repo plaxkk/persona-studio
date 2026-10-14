@@ -4,6 +4,7 @@ import uuid
 from typing import Literal
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel, Field
+from .creation_media import MAX_BYTES, Media
 from .security import sanitize
 
 
@@ -27,7 +28,25 @@ class Finalize(BaseModel):
     version: int = Field(ge=1)
 
 
+class MediaStart(BaseModel):
+    filename: str = Field(min_length=1, max_length=200)
+    mime: str = Field(min_length=1, max_length=100)
+    bytes: int = Field(ge=1, le=MAX_BYTES)
+    sha256: str = Field(default='', max_length=64)
+
+
+class MediaChunk(BaseModel):
+    index: int = Field(ge=0, le=100_000)
+    data: str = Field(min_length=1, max_length=600_000)
+
+
 def register(app, store, jobs, session, vault):
+    media = Media(store)
+
+    def owned(ident):
+        if not store.rows('SELECT id FROM creations WHERE id=?', (ident,)):
+            raise HTTPException(404, '创作记录不存在')
+
     def editable(c, ident, version):
         row = c.execute('SELECT * FROM creations WHERE id=?', (ident,)).fetchone()
         if not row:
@@ -104,5 +123,39 @@ def register(app, store, jobs, session, vault):
                 raise HTTPException(422, '先生成或写好候选稿，再确认定稿。')
             draft_id = store.draft(row['candidate'], 'post', c=c)
             c.execute("UPDATE creations SET stage='final',draft_id=?,version=version+1,updated=? WHERE id=?", (draft_id, int(time.time()), ident))
+            c.execute("UPDATE creation_media SET draft_id=? WHERE creation_id=? AND draft_id IS NULL", (draft_id, ident))
             store.event('draft', '已确认定稿，等待手动发布', {'draft_id': draft_id, 'creation_id': ident}, c)
         return {'draft_id': draft_id}
+
+    # Attachments are local reference material for manual publishing: the studio
+    # never uploads them to X. They stay editable after finalizing so a picture
+    # can still be added (or dropped) while the text is being copied over.
+    @app.get('/api/v1/creations/{ident}/media', dependencies=[Depends(session)])
+    def media_list(ident: str):
+        owned(ident)
+        return media.rows(ident)
+
+    @app.post('/api/v1/creations/{ident}/media', dependencies=[Depends(session)])
+    def media_start(ident: str, body: MediaStart):
+        owned(ident)
+        return media.start(ident, body.filename, body.mime, body.bytes, body.sha256)
+
+    @app.post('/api/v1/creations/{ident}/media/{media_id}/chunks', dependencies=[Depends(session)])
+    def media_chunk(ident: str, media_id: str, body: MediaChunk):
+        owned(ident)
+        return media.append(ident, media_id, body.index, body.data)
+
+    @app.post('/api/v1/creations/{ident}/media/{media_id}/complete', dependencies=[Depends(session)])
+    def media_complete(ident: str, media_id: str):
+        owned(ident)
+        return media.complete(ident, media_id)
+
+    @app.get('/api/v1/creations/{ident}/media/{media_id}/chunks/{index}', dependencies=[Depends(session)])
+    def media_read(ident: str, media_id: str, index: int):
+        owned(ident)
+        return media.read(ident, media_id, index)
+
+    @app.delete('/api/v1/creations/{ident}/media/{media_id}', dependencies=[Depends(session)])
+    def media_remove(ident: str, media_id: str):
+        owned(ident)
+        return media.remove(ident, media_id)
