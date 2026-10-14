@@ -11,6 +11,8 @@ from .browser_identity import EXTENSION_ORIGIN
 from .desktop import CLOUD_ORIGIN
 from .security import digest
 from .browser_reads import BrowserReads
+from .browser_chunks import ChunkError, ResultChunks
+from .analytics_browser_reads import AnalyticsBrowserReads
 
 
 class Create(BaseModel):
@@ -28,6 +30,7 @@ class Apply(BaseModel):
 def register(app, store, session, allowed_hosts):
     imports = PersonaImports(store)
     reads = BrowserReads(store)
+    analytics_reads = AnalyticsBrowserReads(store)
     app.state.persona_imports = imports
     auth = [Depends(session)]
 
@@ -138,13 +141,37 @@ def register(app, store, session, allowed_hosts):
                 imports.presence(str(hello.get("version", "")))
                 if reads.connected():
                     store.set("browser_reads_preferred", True)
-                action = imports.next_action() or reads.next_action()
+                action = imports.next_action() or reads.next_action() or analytics_reads.next_action()
                 await ws.send_json({"action": action})
-                msg = await asyncio.wait_for(ws.receive_json(), 40)
-                if len(json.dumps(msg)) > 950000:
-                    await ws.close(code=1009)
+                chunks = ResultChunks(action["id"]) if action else None
+                while True:
+                    msg = await asyncio.wait_for(ws.receive_json(), 40)
+                    if len(json.dumps(msg)) > 950000:
+                        await ws.close(code=1009)
+                        return
+                    if not isinstance(msg, dict):
+                        await ws.close(code=1008)
+                        return
+                    if msg.get("type") == "result_chunk":
+                        if chunks is None:
+                            await ws.close(code=1008)
+                            return
+                        try:
+                            msg = chunks.accept(msg)
+                        except ChunkError:
+                            await ws.close(code=1008)
+                            return
+                        if msg is None:
+                            continue
+                    elif chunks is not None and chunks.parts:
+                        await ws.close(code=1008)
+                        return
                     break
                 if msg.get("type") == "result":
+                    if action and action.get("transport") == "analytics":
+                        if str(msg.get("id", "")) == str(action["id"]):
+                            analytics_reads.receive(action["id"], msg.get("data"))
+                        continue
                     if action and action.get('transport') == 'sync':
                         if str(msg.get('id', '')) == str(action['id']):
                             reads.receive(action['id'], msg.get('data'))

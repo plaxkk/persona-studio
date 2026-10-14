@@ -12,6 +12,7 @@ import { registerSave } from "../pending";
 import { api, safeXUrl, time } from "../api";
 import type { Actions, Draft } from "../types";
 import { Badge, Button, External } from "./UI";
+type MetricSnapshot = { observed_at: number; age_seconds: number | null; target_window: string; window_status: string; views: number | null; likes: number | null; replies: number | null; reposts: number | null };
 export function DraftEditor({
   draft,
   username,
@@ -30,8 +31,11 @@ export function DraftEditor({
     [fallback, setFallback] = useState(false),
     [handoff, setHandoff] = useState(false),
     [confirming, setConfirming] = useState(false),
-    [resultUrl, setResultUrl] = useState(""),
-    [versions, setVersions] = useState<{ version: number; text: string }[]>([]);
+    [resultUrl, setResultUrl] = useState(draft.result_url || ""),
+    [publicationKind, setPublicationKind] = useState(draft.publication_kind || (draft.kind === "reply" ? "reply" : "post")),
+    [editReason, setEditReason] = useState("手动润色"),
+    [versions, setVersions] = useState<{ version: number; text: string; reason: string }[]>([]),
+    [metrics, setMetrics] = useState<{ snapshots: MetricSnapshot[] } | null>(null);
   const current = useRef({ text, version });
   current.current = { text, version };
   const saving = useRef<Promise<Draft> | null>(null);
@@ -66,6 +70,7 @@ export function DraftEditor({
         const saved = await api<Draft>("/drafts/" + draft.id, "PUT", {
           text: snapshot.text,
           version: snapshot.version,
+          reason: editReason,
         });
         savedText.current = saved.text;
         current.current.version = saved.version;
@@ -109,7 +114,13 @@ export function DraftEditor({
       save().catch((e) => actions.notify((e as Error).message, true));
     }, 1100);
     return () => clearTimeout(timer);
-  }, [text]);
+  }, [text, editReason]);
+  useEffect(() => {
+    if (draft.status !== "confirmed") return;
+    api<{ snapshots: MetricSnapshot[] }>("/drafts/" + draft.id + "/metrics")
+      .then(setMetrics)
+      .catch(() => setMetrics(null));
+  }, [draft.id, draft.status, draft.platform_observed_at]);
   const target =
     draft.kind === "reply"
       ? safeXUrl(draft.source_url || "") || null
@@ -191,6 +202,15 @@ export function DraftEditor({
         placeholder="把想说的话留在这里…"
         rows={compact ? 4 : 7}
       />
+      {editable && <label className="draft-edit-reason">修改原因
+        <select value={editReason} onChange={(e) => setEditReason(e.target.value)}>
+          <option value="手动润色">手动润色</option>
+          <option value="太正式">太正式</option>
+          <option value="信息不足">信息不足</option>
+          <option value="表达像套话">表达像套话</option>
+          <option value="经历或事实不准确">经历或事实不准确</option>
+        </select>
+      </label>}
       <div className="draft-footnote">
         <span>{Array.from(text).length} 个字符 · 虚构人格内容</span>
         <span>最终内容与账号请在 X 核对</span>
@@ -274,7 +294,7 @@ export function DraftEditor({
         {draft.status === "confirmed" ? (
           <Badge tone="green">
             <Check size={13} />
-            用户确认完成 · 未经平台验证
+          {draft.platform_observed_at ? "平台已读取到帖子" : "用户确认完成 · 平台尚未核验"}
           </Badge>
         ) : (
           editable && (
@@ -320,14 +340,34 @@ export function DraftEditor({
           </External>
         </p>
       )}
+      {draft.status === "confirmed" && <button className="text-button" onClick={() => setConfirming(!confirming)}>
+        {draft.result_url ? "修改发布链接" : "补充发布链接"}
+      </button>}
+      {draft.status === "confirmed" && draft.tweet_id && <div className="spaced-small">
+        <p>{draft.platform_observed_at ? `X 帖子已读取 · 发布时间：${draft.published_at ? time(draft.published_at) : "未知"}` : "等待从 X 读取这条帖子的真实发布时间和效果。"}</p>
+        {metrics?.snapshots.map((snapshot) => <p key={snapshot.observed_at}>
+          {snapshot.target_window === "baseline" ? "首次读取" : snapshot.target_window + (snapshot.window_status === "late" ? "（补读）" : snapshot.window_status === "on_time" ? "（按时）" : snapshot.window_status === "early" ? "（提前读取）" : "（时间未知）")}
+          {" · 实际读取 " + time(snapshot.observed_at)}
+          {" · 浏览 " + (snapshot.views ?? "暂无数据")}
+          {" · 喜欢 " + (snapshot.likes ?? "暂无数据")}
+          {" · 回复 " + (snapshot.replies ?? "暂无数据")}
+          {" · 转发 " + (snapshot.reposts ?? "暂无数据")}
+        </p>)}
+        <Button onClick={() => void actions.run(() => api("/drafts/" + draft.id + "/metrics/read", "POST", {}), "已加入帖子数据读取队列")}>读取最新可见指标</Button>
+      </div>}
       {confirming && (
         <div className="confirm-box">
-          <p>此记录只代表你的确认，产品不会自动核验 X 上的发布结果。</p>
+          <p>先记录你的确认；连接助手读到这条帖子后，才会显示“平台已读取”。</p>
+          {draft.kind !== "reply" && <label>发布类型
+            <select value={publicationKind} onChange={(e) => setPublicationKind(e.target.value as "post" | "quote")}>
+              <option value="post">原创</option><option value="quote">引用</option>
+            </select>
+          </label>}
           <input
             aria-label="结果链接"
             value={resultUrl}
             onChange={(e) => setResultUrl(e.target.value)}
-            placeholder="可选：粘贴你发布后的 X 帖子链接"
+            placeholder="粘贴你发布后的 X 帖子链接，才能跟踪效果"
           />
           <Button
             onClick={() =>
@@ -335,6 +375,7 @@ export function DraftEditor({
                 if (dirty) await save();
                 await api("/drafts/" + draft.id + "/confirm", "POST", {
                   result_url: resultUrl,
+                  publication_kind: publicationKind,
                 });
                 setConfirming(false);
               }, "已记录为用户确认完成")
@@ -349,7 +390,7 @@ export function DraftEditor({
           <summary>已保存的版本</summary>
           {versions.map((v) => (
             <p key={v.version}>
-              <strong>v{v.version}</strong> {v.text || "空白草稿"}
+              <strong>v{v.version}</strong> {v.reason && <small> · {v.reason}</small>} {v.text || "空白草稿"}
             </p>
           ))}
         </details>

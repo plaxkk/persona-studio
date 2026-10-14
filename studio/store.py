@@ -1,6 +1,7 @@
 from __future__ import annotations
 import json
 import os
+import re
 import sqlite3
 import shutil
 import time
@@ -27,6 +28,9 @@ DEFAULTS = dict(
     per_round=3,
     worker_heartbeat=0,
     telegram_status="not_connected",
+    supabase_url="",
+    analytics_cloud_last_status="not_configured",
+    analytics_cloud_checked_at=0,
 )
 PERSONA = dict(
     name="未命名的角色",
@@ -138,6 +142,136 @@ class Store:
                 CREATE INDEX IF NOT EXISTS interaction_posts_author ON posts(author,created DESC);
                 """)
                 c.execute("INSERT INTO migrations VALUES(3,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=4").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS draft_publications(
+                    draft_id TEXT PRIMARY KEY REFERENCES drafts(id),
+                    tweet_id TEXT, url TEXT, author TEXT,
+                    user_confirmed INTEGER NOT NULL DEFAULT 0,
+                    user_confirmed_at INTEGER,
+                    platform_observed_at INTEGER,
+                    published_at INTEGER,
+                    observation_source TEXT,
+                    publication_kind TEXT NOT NULL DEFAULT 'post'
+                );
+                CREATE INDEX IF NOT EXISTS publication_tweet ON draft_publications(tweet_id);
+                CREATE TABLE IF NOT EXISTS post_metric_snapshots(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tweet_id TEXT NOT NULL, observed_at INTEGER NOT NULL,
+                    published_at INTEGER, age_seconds INTEGER,
+                    target_window TEXT, window_status TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    views INTEGER, likes INTEGER, replies INTEGER,
+                    reposts INTEGER, quotes INTEGER, bookmarks INTEGER,
+                    UNIQUE(tweet_id,observed_at,source)
+                );
+                CREATE INDEX IF NOT EXISTS metric_tweet_time ON post_metric_snapshots(tweet_id,observed_at DESC);
+                CREATE TABLE IF NOT EXISTS profile_snapshots(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account TEXT NOT NULL, observed_at INTEGER NOT NULL,
+                    day TEXT NOT NULL, followers INTEGER,
+                    bio TEXT, pinned_tweet_id TEXT, source TEXT NOT NULL,
+                    UNIQUE(account,day,source)
+                );
+                CREATE TABLE IF NOT EXISTS metric_reads(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL UNIQUE,
+                    tweet_id TEXT NOT NULL, author TEXT NOT NULL,
+                    account TEXT NOT NULL, status TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '{}', updated INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS profile_reads(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL UNIQUE,
+                    account TEXT NOT NULL, status TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '{}', updated INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS growth_goals(
+                    id INTEGER PRIMARY KEY CHECK(id=1), target_followers INTEGER NOT NULL,
+                    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+                );
+                """)
+                columns = {r['name'] for r in c.execute("PRAGMA table_info(draft_versions)")}
+                if 'reason' not in columns:
+                    c.execute("ALTER TABLE draft_versions ADD COLUMN reason TEXT NOT NULL DEFAULT ''")
+                for row in c.execute("SELECT id,kind,result_url FROM drafts WHERE status='confirmed'").fetchall():
+                    url = row['result_url'] or None
+                    match = re.fullmatch(r'https://x\.com/([A-Za-z0-9_]{1,15})/status/([0-9]{1,30})', url or '')
+                    c.execute("INSERT OR IGNORE INTO draft_publications(draft_id,tweet_id,url,author,user_confirmed,publication_kind) VALUES(?,?,?,?,1,?)",
+                              (row['id'], match[2] if match else None, url, match[1] if match else None, 'reply' if row['kind'] == 'reply' else 'post'))
+                c.execute("INSERT INTO migrations VALUES(4,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=5").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS analytics_runs(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL, source TEXT NOT NULL,
+                    window_from TEXT NOT NULL, window_to TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL, request_limit INTEGER NOT NULL,
+                    received_count INTEGER NOT NULL, parsed_count INTEGER NOT NULL,
+                    gap_count INTEGER NOT NULL, at_request_limit INTEGER NOT NULL,
+                    parser_version INTEGER NOT NULL, raw_json TEXT NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS analytics_runs_pending
+                    ON analytics_runs(cloud_status,cloud_retry_at,observed_at);
+                CREATE TABLE IF NOT EXISTS analytics_post_metrics(
+                    run_id TEXT NOT NULL REFERENCES analytics_runs(id),
+                    post_id TEXT NOT NULL, published_at_ms INTEGER NOT NULL,
+                    text TEXT NOT NULL, metrics_json TEXT NOT NULL,
+                    PRIMARY KEY(run_id,post_id));
+                CREATE INDEX IF NOT EXISTS analytics_post_history
+                    ON analytics_post_metrics(post_id,run_id);
+                CREATE TABLE IF NOT EXISTS analytics_coverage_gaps(
+                    run_id TEXT NOT NULL REFERENCES analytics_runs(id),
+                    item_index INTEGER NOT NULL, post_id TEXT,
+                    reason TEXT NOT NULL, PRIMARY KEY(run_id,item_index));
+                """)
+                c.execute("INSERT INTO migrations VALUES(5,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=6").fetchone():
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS analytics_browser_reads(
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+                    account TEXT NOT NULL, days INTEGER NOT NULL,
+                    status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}',
+                    updated INTEGER NOT NULL);
+                CREATE INDEX IF NOT EXISTS analytics_browser_queue
+                    ON analytics_browser_reads(status,updated);
+                """)
+                c.execute("INSERT INTO migrations VALUES(6,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=7").fetchone():
+                c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN from_date TEXT")
+                c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN to_date TEXT")
+                c.execute("INSERT INTO migrations VALUES(7,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=8").fetchone():
+                c.execute("ALTER TABLE analytics_browser_reads ADD COLUMN kind TEXT NOT NULL DEFAULT 'content'")
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS analytics_overview_runs(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL,
+                    window_from TEXT NOT NULL, window_to TEXT NOT NULL,
+                    previous_from TEXT NOT NULL, previous_to TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL, point_count INTEGER NOT NULL,
+                    gap_count INTEGER NOT NULL, parser_version INTEGER NOT NULL,
+                    scalars_json TEXT NOT NULL, raw_json TEXT NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS analytics_overview_pending
+                    ON analytics_overview_runs(cloud_status,cloud_retry_at,observed_at);
+                CREATE TABLE IF NOT EXISTS analytics_overview_points(
+                    run_id TEXT NOT NULL REFERENCES analytics_overview_runs(id),
+                    series TEXT NOT NULL, item_index INTEGER NOT NULL,
+                    metric_index INTEGER NOT NULL, timestamp_ms INTEGER NOT NULL,
+                    metric_type TEXT NOT NULL, count REAL, verified INTEGER,
+                    PRIMARY KEY(run_id,series,item_index,metric_index));
+                CREATE TABLE IF NOT EXISTS analytics_overview_gaps(
+                    run_id TEXT NOT NULL REFERENCES analytics_overview_runs(id),
+                    series TEXT NOT NULL, item_index INTEGER NOT NULL,
+                    metric_index INTEGER NOT NULL, reason TEXT NOT NULL,
+                    PRIMARY KEY(run_id,series,item_index,metric_index,reason));
+                """)
+                c.execute("INSERT INTO migrations VALUES(8,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):
@@ -323,7 +457,7 @@ class Store:
                         ),
                     )
                     c.execute(
-                        "INSERT INTO draft_versions VALUES(?,?,?,?)",
+                        "INSERT INTO draft_versions(draft_id,version,text,created) VALUES(?,?,?,?)",
                         (
                             "legacy-" + str(r["id"]),
                             1,
@@ -362,5 +496,5 @@ class Store:
             "INSERT INTO drafts(id,kind,text,post_id,persona_version,engine,created,updated) VALUES(?,?,?,?,?,?,?,?)",
             (ident, kind, text, post_id, persona["version"], engine, now, now),
         )
-        c.execute("INSERT INTO draft_versions VALUES(?,?,?,?)", (ident, 1, text, now))
+        c.execute("INSERT INTO draft_versions(draft_id,version,text,created) VALUES(?,?,?,?)", (ident, 1, text, now))
         return ident

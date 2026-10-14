@@ -4,6 +4,7 @@ import json
 import re
 import time
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from .security import sanitize
 from .xreader import ReadError, tweet_row
 from .sync_status import SOURCES
@@ -29,6 +30,12 @@ class BrowserReads:
                 UNION ALL
                 SELECT 1 FROM interaction_context_reads b JOIN tasks t ON t.id=b.task_id
                 WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                UNION ALL
+                SELECT 1 FROM metric_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
+                UNION ALL
+                SELECT 1 FROM profile_reads b JOIN tasks t ON t.id=b.task_id
+                WHERE b.status='sent' AND t.status='running' AND t.cancel=0
                 LIMIT 1""").fetchone()
             if busy:
                 return None
@@ -38,16 +45,30 @@ class BrowserReads:
                 return {'id': row['id'], 'source': row['source'], 'account': row['account'],
                         'kind': 'sync_read', 'transport': 'sync'}
             row = c.execute("SELECT b.* FROM interaction_context_reads b JOIN tasks t ON t.id=b.task_id WHERE b.status='queued' AND b.updated<=? AND t.status='running' AND t.cancel=0 ORDER BY b.id LIMIT 1", (int(time.time()),)).fetchone()
-            if not row: return None
-            c.execute("UPDATE interaction_context_reads SET status='sent',updated=? WHERE id=?", (int(time.time()), row['id']))
-            return {'id': 'context:' + str(row['id']), 'kind': 'context_read', 'transport': 'sync',
-                    'post_id': row['post_id'], 'author': row['author'], 'account': row['account']}
+            if row:
+                c.execute("UPDATE interaction_context_reads SET status='sent',updated=? WHERE id=?", (int(time.time()), row['id']))
+                return {'id': 'context:' + str(row['id']), 'kind': 'context_read', 'transport': 'sync',
+                        'post_id': row['post_id'], 'author': row['author'], 'account': row['account']}
+            row = c.execute("SELECT b.* FROM metric_reads b JOIN tasks t ON t.id=b.task_id WHERE b.status='queued' AND b.updated<=? AND t.status='running' AND t.cancel=0 ORDER BY b.id LIMIT 1", (int(time.time()),)).fetchone()
+            if row:
+                c.execute("UPDATE metric_reads SET status='sent',updated=? WHERE id=?", (int(time.time()), row['id']))
+                return {'id': 'metric:' + str(row['id']), 'kind': 'metric_read', 'transport': 'sync',
+                        'post_id': row['tweet_id'], 'author': row['author'], 'account': row['account']}
+            row = c.execute("SELECT b.* FROM profile_reads b JOIN tasks t ON t.id=b.task_id WHERE b.status='queued' AND b.updated<=? AND t.status='running' AND t.cancel=0 ORDER BY b.id LIMIT 1", (int(time.time()),)).fetchone()
+            if row:
+                c.execute("UPDATE profile_reads SET status='sent',updated=? WHERE id=?", (int(time.time()), row['id']))
+                return {'id': 'profile:' + str(row['id']), 'kind': 'profile_read', 'transport': 'sync',
+                        'account': row['account']}
+            return None
 
     def receive(self, ident, data):
         # Only the authenticated extension bridge can call this method.
         if not isinstance(data, dict): return
         if isinstance(ident, str) and ident.startswith('context:'):
             self.receive_context(ident, data)
+            return
+        if isinstance(ident, str) and ident.startswith(('metric:', 'profile:')):
+            self.receive_measurement(ident, data)
             return
         with self.store.db(True) as c:
             row = c.execute("SELECT * FROM browser_reads WHERE id=? AND status='sent'", (ident,)).fetchone()
@@ -93,6 +114,96 @@ class BrowserReads:
                 status, available = 'done', int(time.time())
             c.execute("UPDATE interaction_context_reads SET status=?,result=?,updated=? WHERE id=?",
                       (status, json.dumps(data, ensure_ascii=False), available, row['id']))
+
+    def receive_measurement(self, ident, data):
+        kind, _, number = ident.partition(':')
+        if kind not in ('metric','profile') or not number.isdigit(): return
+        table = 'metric_reads' if kind == 'metric' else 'profile_reads'
+        with self.store.db(True) as c:
+            row = c.execute(f"SELECT * FROM {table} WHERE id=? AND status='sent'", (int(number),)).fetchone()
+            if not row: return
+            if (data.get('state') == 'ready' and
+                (str(data.get('account','')).lower() != row['account'].lower() or
+                 not isinstance(data.get('record'),dict) or
+                 (kind == 'metric' and (str(data.get('post_id')) != row['tweet_id'] or
+                  str(data.get('author','')).lower() != row['author'].lower())))):
+                data = {'state':'source_error'}
+            if len(json.dumps(data, ensure_ascii=False)) > 10000: data = {'state':'source_error'}
+            retries = int(json.loads(row['result']).get('_retry',0))
+            if data.get('state') in ('waiting_browser','source_error') and retries < 2:
+                data = {'state':data['state'],'_retry':retries+1}
+                status, available = 'queued', int(time.time()) + 10 * 2 ** retries
+            else:
+                status, available = 'done', int(time.time())
+                data['_observed_at'] = available
+            c.execute(f"UPDATE {table} SET status=?,result=?,updated=? WHERE id=?",
+                      (status,json.dumps(data,ensure_ascii=False),available,row['id']))
+
+    async def metric(self, job, alive):
+        if not self.connected(8): raise ReadError('browser_offline')
+        post_id = str(job['payload'].get('tweet_id',''))
+        rows = self.store.rows("SELECT author FROM draft_publications WHERE tweet_id=? AND author IS NOT NULL LIMIT 1",(post_id,))
+        if not rows or not re.fullmatch(r'\d{1,30}',post_id): raise ReadError('post_missing')
+        account = self.store.get('x_username')
+        with self.store.db(True) as c:
+            c.execute("INSERT OR IGNORE INTO metric_reads(task_id,tweet_id,author,account,status,updated) VALUES(?,?,?,?,?,?)",
+                      (job['id'],post_id,rows[0]['author'],account,'queued',int(time.time())))
+            c.execute("UPDATE metric_reads SET status='queued' WHERE task_id=? AND status='sent'",(job['id'],))
+        data = await self._wait_measurement('metric_reads',job,alive)
+        if data.get('state') != 'ready': raise ReadError('source_error')
+        observed = data['_observed_at']
+        record = data.get('record') or {}
+        try: published = int(datetime.fromisoformat(str(record['created_at']).replace('Z','+00:00')).timestamp())
+        except (KeyError,TypeError,ValueError,OverflowError): published = None
+        if published is not None and not (1136073600 <= published <= observed+300): published = None
+        counts = {}
+        for key in ('views','likes','replies','reposts','quotes','bookmarks'):
+            value = record.get(key)
+            counts[key] = value if type(value) is int and 0 <= value <= 10**12 else None
+        target = str(job['payload'].get('target_window','baseline'))
+        if target not in ('baseline','24h','72h'): target = 'baseline'
+        age = observed-published if published else None
+        expected = {'24h':86400,'72h':259200}.get(target)
+        window_status = ('baseline' if expected is None else 'unknown' if age is None else
+                         'on_time' if abs(age-expected) <= 7200 else 'late' if age>expected else 'early')
+        kind = record.get('kind') if record.get('kind') in ('post','quote','reply') else None
+        with self.store.db(True) as c:
+            c.execute("UPDATE draft_publications SET platform_observed_at=?,published_at=COALESCE(?,published_at),observation_source='browser',publication_kind=COALESCE(?,publication_kind) WHERE tweet_id=?",
+                      (observed,published,kind,post_id))
+            c.execute("INSERT OR IGNORE INTO post_metric_snapshots(tweet_id,observed_at,published_at,age_seconds,target_window,window_status,source,views,likes,replies,reposts,quotes,bookmarks) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                      (post_id,observed,published,age,target,window_status,'browser',*(counts[k] for k in ('views','likes','replies','reposts','quotes','bookmarks'))))
+        return {'tweet_id':post_id,'observed_at':observed,'target_window':target,'window_status':window_status}
+
+    async def profile(self, job, alive):
+        if not self.connected(8): raise ReadError('browser_offline')
+        account = self.store.get('x_username')
+        with self.store.db(True) as c:
+            c.execute("INSERT OR IGNORE INTO profile_reads(task_id,account,status,updated) VALUES(?,?,?,?)",
+                      (job['id'],account,'queued',int(time.time())))
+            c.execute("UPDATE profile_reads SET status='queued' WHERE task_id=? AND status='sent'",(job['id'],))
+        data = await self._wait_measurement('profile_reads',job,alive)
+        if data.get('state') != 'ready': raise ReadError('source_error')
+        record = data.get('record') or {}
+        count = record.get('followers')
+        followers = count if type(count) is int and 0 <= count <= 10**12 else None
+        pin = str(record.get('pinned_tweet_id') or '')
+        pin = pin if re.fullmatch(r'\d{1,30}',pin) else None
+        observed = data['_observed_at']
+        day = datetime.fromtimestamp(observed,ZoneInfo(self.store.get('timezone','Asia/Shanghai'))).date().isoformat()
+        with self.store.db(True) as c:
+            c.execute("INSERT INTO profile_snapshots(account,observed_at,day,followers,bio,pinned_tweet_id,source) VALUES(?,?,?,?,?,?,?) ON CONFLICT(account,day,source) DO UPDATE SET observed_at=excluded.observed_at,followers=COALESCE(excluded.followers,profile_snapshots.followers),bio=excluded.bio,pinned_tweet_id=excluded.pinned_tweet_id",
+                      (account,observed,day,followers,sanitize(str(record.get('bio',''))[:3000]),pin,'browser'))
+        return {'account':account,'observed_at':observed,'followers':followers}
+
+    async def _wait_measurement(self, table, job, alive):
+        deadline = time.monotonic()+180
+        while time.monotonic()<deadline:
+            if not alive(job): raise ReadError('cancelled')
+            row = self.store.rows(f"SELECT status,result FROM {table} WHERE task_id=?",(job['id'],))[0]
+            if row['status']=='done': return json.loads(row['result'])
+            if not self.connected(8): break
+            await asyncio.sleep(1)
+        raise ReadError('timeout')
 
     async def enrich(self, job, alive):
         if not self.connected(7): raise ReadError('browser_offline')

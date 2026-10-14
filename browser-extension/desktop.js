@@ -26,17 +26,17 @@ export function allowedRoute(path, method) {
   )
     return true;
   if (method === "GET")
-    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|interactions(\/(page|skills))?|messages|creations(\/[a-f0-9]{32})?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/versions)?|events|diagnostics)$/.test(
+    return /^\/(auth\/(status|session)|health|overview|settings|persona(\/versions)?|memory|engines|connections|growth|analytics\/(content|overview)|interactions(\/(page|skills))?|messages|creations(\/[a-f0-9]{32})?|tasks(\/[a-f0-9-]+)?|drafts(\/[a-f0-9-]+\/(versions|metrics))?|events|diagnostics)$/.test(
       pathname,
     );
   if (method === "POST")
-    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive))?|backup)$/.test(
+    return /^\/(auth\/logout|pause|persona\/(feedback|corpus)|engines\/(hermes|openclaw|codex)\/(verify|select)|sync|growth\/read|analytics\/(content\/(read|backfill)|overview\/read)|interactions\/(skills|[0-9]+\/(ignore|context))|generate|creations(\/[a-f0-9]{32}\/(turn|finalize))?|tasks\/[a-f0-9-]+\/cancel|drafts(\/[a-f0-9-]+\/(opened|confirm|archive|metrics\/read))?|backup)$/.test(
       pathname,
     );
   if (method === "DELETE") return /^\/interactions\/skills\/[0-9]+$/.test(pathname);
   return (
     method === "PUT" &&
-    /^\/(settings|persona|creations\/[a-f0-9]{32}|drafts\/[a-f0-9-]+|interactions\/([0-9]+\/review|skills\/[0-9]+))$/.test(pathname)
+    /^\/(settings|persona|growth\/goal|creations\/[a-f0-9]{32}|drafts\/[a-f0-9-]+|interactions\/([0-9]+\/review|skills\/[0-9]+))$/.test(pathname)
   );
 }
 export async function desktopMessage(message, sender) {

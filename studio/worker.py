@@ -8,6 +8,21 @@ from .store import Store
 from .jobs import Jobs
 from .telegram import Telegram
 from .codex_persona import CodexPersonaRunner
+from .supabase_analytics import sync_one_content_run, sync_one_overview_run
+
+
+async def sync_analytics_cloud(store):
+    try:
+        content = await asyncio.to_thread(sync_one_content_run, store)
+        overview = await asyncio.to_thread(sync_one_overview_run, store)
+        result = overview if overview["status"] != "idle" else content
+    except Exception:
+        # The worker must keep running; neither exception text nor credentials
+        # are copied into logs or the public diagnostics endpoint.
+        result = {"status": "internal_error"}
+    store.set("analytics_cloud_last_status", result["status"])
+    store.set("analytics_cloud_checked_at", int(time.time()))
+    return result
 
 
 async def serve(store):
@@ -20,7 +35,9 @@ async def serve(store):
     persona = None
     active = None
     tele = None
+    cloud = None
     last_telegram = 0
+    last_cloud = 0
     last_cleanup = time.time()
     try:
         while True:
@@ -43,13 +60,18 @@ async def serve(store):
                     await tele
                 tele = asyncio.create_task(telegram.tick())
                 last_telegram = time.time()
+            if time.time() - last_cloud >= 30 and (cloud is None or cloud.done()):
+                if cloud is not None:
+                    await cloud
+                cloud = asyncio.create_task(sync_analytics_cloud(store))
+                last_cloud = time.time()
             await asyncio.sleep(1)
     finally:
-        for task in [active, tele, persona]:
+        for task in [active, tele, persona, cloud]:
             if task:
                 task.cancel()
         await asyncio.gather(
-            *(t for t in [active, tele, persona] if t), return_exceptions=True
+            *(t for t in [active, tele, persona, cloud] if t), return_exceptions=True
         )
         store.set("worker_heartbeat", 0)
 

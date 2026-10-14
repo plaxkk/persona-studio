@@ -17,6 +17,7 @@ _KEYS = {
     "telegram": ["TELEGRAM_BOT_TOKEN"],
     "hermes": ["ENGINE_HERMES_API_KEY"],
     "openclaw": ["ENGINE_OPENCLAW_API_KEY"],
+    "supabase": ["SUPABASE_SECRET_KEY"],
 }
 _lock = threading.RLock()
 

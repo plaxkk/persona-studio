@@ -32,6 +32,8 @@ from .engines import Engines, EngineError
 from .jobs import Jobs, JobError
 from .xreader import XReader, ReadError
 from .interactions import candidate_ids, context_state, enrich_rows, reply_block, topic_for, scene_for
+from .supabase_analytics import SupabaseConfigError, _config as check_supabase_config, configured as supabase_configured
+from .analytics_browser_reads import CONTENT_DAYS, valid_date_range, backfill_windows
 
 ROOT = Path(__file__).resolve().parents[1]
 ERRORS = {
@@ -125,6 +127,22 @@ class TelegramConfig(Input):
     enabled: bool = False
 
 
+class SupabaseConfig(Input):
+    url: str = Field(max_length=500)
+    secret_key: str = Field(default="", max_length=4096)
+
+
+class AnalyticsContentRequest(Input):
+    days: int = 28
+    from_date: str | None = None
+    to_date: str | None = None
+
+
+class AnalyticsBackfillRequest(Input):
+    from_date: str
+    to_date: str
+
+
 class Generate(Input):
     kind: str
     text: str = Field(default="", max_length=12000)
@@ -142,10 +160,16 @@ class DraftIn(Input):
 class DraftEdit(Input):
     text: str = Field(max_length=12000)
     version: int = Field(ge=1)
+    reason: str = Field(default="", max_length=1000)
 
 
 class Completion(Input):
     result_url: str = Field(default="", max_length=1000)
+    publication_kind: str = Field(default="", pattern=r"^(|post|quote|reply)$")
+
+
+class GrowthGoal(Input):
+    target_followers: int = Field(ge=1, le=100_000_000)
 
 
 class Text(Input):
@@ -742,6 +766,17 @@ def create_app(state_dir=None, public_url=None):
 
     @app.get("/api/v1/connections", dependencies=[Depends(session)])
     def connections():
+        cloud_counts = {row["cloud_status"]: row["n"] for row in store.rows(
+            "SELECT cloud_status,count(*) AS n FROM analytics_runs GROUP BY cloud_status")}
+        for row in store.rows(
+                "SELECT cloud_status,count(*) AS n FROM analytics_overview_runs GROUP BY cloud_status"):
+            cloud_counts[row["cloud_status"]] = cloud_counts.get(row["cloud_status"], 0) + row["n"]
+        cloud_error = store.rows("SELECT cloud_error FROM analytics_runs WHERE cloud_status='retry' "
+                                 "ORDER BY observed_at DESC LIMIT 1")
+        if not cloud_error:
+            cloud_error = store.rows(
+                "SELECT cloud_error FROM analytics_overview_runs WHERE cloud_status='retry' "
+                "ORDER BY observed_at DESC LIMIT 1")
         return {
             "x": {
                 "username": store.get("x_username"),
@@ -755,7 +790,132 @@ def create_app(state_dir=None, public_url=None):
                 "status": store.get("telegram_status"),
                 "credentials": vault.present("telegram"),
             },
+            "supabase": {
+                "url": store.get("supabase_url"),
+                "configured": supabase_configured(store),
+                "queued": cloud_counts.get("pending", 0) + cloud_counts.get("retry", 0)
+                          + cloud_counts.get("sending", 0),
+                "synced": cloud_counts.get("synced", 0),
+                "last_status": store.get("analytics_cloud_last_status"),
+                "last_checked_at": store.get("analytics_cloud_checked_at"),
+                "last_error": cloud_error[0]["cloud_error"] if cloud_error else "",
+            },
         }
+
+    @app.get("/api/v1/analytics/content", dependencies=[Depends(session)])
+    def analytics_content():
+        from .browser_reads import BrowserReads
+        return {
+            "browser_ready": BrowserReads(store).connected(11),
+            "history_ready": BrowserReads(store).connected(12),
+            "runs": store.rows(
+                "SELECT id,account,source,window_from,window_to,observed_at,"
+                "request_limit,received_count,parsed_count,gap_count,"
+                "at_request_limit,cloud_status,cloud_synced_at "
+                "FROM analytics_runs ORDER BY observed_at DESC,id DESC LIMIT 20"),
+            "tasks": store.rows(
+                "SELECT id,status,created,updated,error,result FROM tasks "
+                "WHERE kind='analytics_content' ORDER BY created DESC,id DESC LIMIT 40"),
+        }
+
+    @app.post("/api/v1/analytics/content/read", dependencies=[Depends(session)])
+    def read_analytics_content(body: AnalyticsContentRequest):
+        from .browser_reads import BrowserReads
+        custom = body.from_date is not None or body.to_date is not None
+        if custom and not valid_date_range(body.from_date, body.to_date):
+            fail("历史日期须在今天以前，且单次不超过 31 天。", 422)
+        if not custom and body.days not in CONTENT_DAYS:
+            fail("请选择 7、14、28 或 90 天的数据范围。", 422)
+        version = 12 if custom else 11
+        if not BrowserReads(store).connected(version):
+            fail(f"连接助手需要更新至 1.3.{version}，才能读取所选 Subscription Analytics 范围。", 409)
+        payload = ({"from_date": body.from_date, "to_date": body.to_date} if custom
+                   else {"days": body.days})
+        key = (f"analytics-content-{body.from_date}-{body.to_date}" if custom
+               else f"analytics-content-{body.days}")
+        return {"task_id": jobs.enqueue(
+            "analytics_content", payload, dedupe=key)}
+
+    @app.post("/api/v1/analytics/content/backfill", dependencies=[Depends(session)])
+    def backfill_analytics_content(body: AnalyticsBackfillRequest):
+        from .browser_reads import BrowserReads
+        windows = backfill_windows(body.from_date, body.to_date)
+        if windows is None:
+            fail("历史补采范围须在今天以前，且最长为 365 天。", 422)
+        if not BrowserReads(store).connected(12):
+            fail("连接助手需要更新至 1.3.12，才能分批补采历史数据。", 409)
+        now = int(time.time())
+        queued, skipped = [], 0
+        for start, end in windows:
+            key = f"analytics-content-{start}-{end}"
+            if store.rows("SELECT 1 FROM tasks WHERE dedupe=? AND status='succeeded' LIMIT 1", (key,)):
+                skipped += 1
+                continue
+            queued.append(jobs.enqueue(
+                "analytics_content", {"from_date": start, "to_date": end},
+                dedupe=key, available=now + len(queued) * 300))
+        return {"task_ids": queued, "queued": len(queued), "skipped_succeeded": skipped,
+                "windows": len(windows)}
+
+    @app.get("/api/v1/analytics/overview", dependencies=[Depends(session)])
+    def analytics_overview():
+        from .browser_reads import BrowserReads
+        runs = store.rows(
+            "SELECT id,account,window_from,window_to,previous_from,previous_to,"
+            "observed_at,point_count,gap_count,scalars_json,cloud_status,"
+            "cloud_synced_at FROM analytics_overview_runs "
+            "ORDER BY observed_at DESC,id DESC LIMIT 20")
+        for run in runs:
+            run["scalars"] = json.loads(run.pop("scalars_json"))
+        return {"browser_ready": BrowserReads(store).connected(13),
+                "runs": runs,
+                "tasks": store.rows(
+                    "SELECT id,status,created,updated,error FROM tasks "
+                    "WHERE kind='analytics_overview' ORDER BY created DESC,id DESC LIMIT 20")}
+
+    @app.post("/api/v1/analytics/overview/read", dependencies=[Depends(session)])
+    def read_analytics_overview():
+        from .browser_reads import BrowserReads
+        if not BrowserReads(store).connected(13):
+            fail("连接助手需要更新至 1.3.13，才能读取 Overview 原始趋势。", 409)
+        return {"task_id": jobs.enqueue(
+            "analytics_overview", {"days": 28},
+            dedupe="analytics-overview-28")}
+
+    @app.put("/api/v1/connections/supabase", dependencies=[Depends(session)])
+    def connect_supabase(body: SupabaseConfig):
+        url = body.url.strip().rstrip("/")
+        old_url = store.get("supabase_url")
+        if old_url and url != old_url:
+            fail("切换 Supabase 项目前，请先移除旧连接。", 409)
+        if url != old_url and not body.secret_key:
+            fail("切换 Supabase 项目时请同时填写该项目的新密钥。", 422)
+        key = body.secret_key or vault.get("SUPABASE_SECRET_KEY")
+        try:
+            check_supabase_config({"SUPABASE_URL": url, "SUPABASE_SECRET_KEY": key})
+        except SupabaseConfigError:
+            fail("请填写有效的 Supabase 项目地址和新式 secret key。", 422)
+        if body.secret_key:
+            vault.update({"SUPABASE_SECRET_KEY": body.secret_key})
+        with store.db(True) as db:
+            store.set("supabase_url", url, db)
+            if url != old_url:
+                db.execute("UPDATE analytics_runs SET cloud_status='pending',cloud_retry_at=0,"
+                           "cloud_error='',cloud_synced_at=NULL")
+            else:
+                db.execute("UPDATE analytics_runs SET cloud_status='pending',cloud_retry_at=0,"
+                           "cloud_error='' WHERE cloud_status='retry'")
+            store.set("analytics_cloud_last_status", "pending", db)
+            store.set("analytics_cloud_checked_at", 0, db)
+        return {"configured": True}
+
+    @app.delete("/api/v1/connections/supabase", dependencies=[Depends(session)])
+    def delete_supabase():
+        vault.delete("supabase")
+        store.set("supabase_url", "")
+        store.set("analytics_cloud_last_status", "not_configured")
+        store.set("analytics_cloud_checked_at", 0)
+        return {"configured": False}
 
     @app.put("/api/v1/connections/x", dependencies=[Depends(session)])
     def connect_x(body: XConfig):
@@ -1012,7 +1172,7 @@ def create_app(state_dir=None, public_url=None):
     @app.get("/api/v1/drafts", dependencies=[Depends(session)])
     def drafts():
         return store.rows(
-            "SELECT drafts.*,creations.id AS creation_id,posts.url AS source_url,posts.text AS source_text,posts.author AS source_author FROM drafts LEFT JOIN posts ON posts.id=drafts.post_id LEFT JOIN creations ON creations.draft_id=drafts.id ORDER BY drafts.updated DESC LIMIT 200"
+            "SELECT drafts.*,creations.id AS creation_id,posts.url AS source_url,posts.text AS source_text,posts.author AS source_author,p.tweet_id,p.user_confirmed_at,p.platform_observed_at,p.published_at,p.publication_kind FROM drafts LEFT JOIN posts ON posts.id=drafts.post_id LEFT JOIN creations ON creations.draft_id=drafts.id LEFT JOIN draft_publications p ON p.draft_id=drafts.id ORDER BY drafts.updated DESC LIMIT 200"
         )
 
     @app.post("/api/v1/drafts", dependencies=[Depends(session)])
@@ -1050,8 +1210,9 @@ def create_app(state_dir=None, public_url=None):
                 (text, now, draft_id),
             )
             c.execute(
-                "INSERT INTO draft_versions VALUES(?,?,?,?)",
-                (draft_id, body.version + 1, text, now),
+                "INSERT INTO draft_versions(draft_id,version,text,created,reason) VALUES(?,?,?,?,?)",
+                (draft_id, body.version + 1, text, now,
+                 sanitize(body.reason, vault.all().values())),
             )
         return store.rows("SELECT * FROM drafts WHERE id=?", (draft_id,))[0]
 
@@ -1072,18 +1233,44 @@ def create_app(state_dir=None, public_url=None):
     @app.post("/api/v1/drafts/{draft_id}/confirm", dependencies=[Depends(session)])
     def confirm(draft_id: str, body: Completion):
         url = canonical_x_url(body.result_url) if body.result_url else ""
+        match = re.fullmatch(r"https://x\.com/([A-Za-z0-9_]{1,15}|i/web)/status/(\d{1,30})", url) if url else None
+        author, tweet_id = (match.group(1), match.group(2)) if match else (None, None)
+        if author == 'i/web':
+            fail("请粘贴包含 X 用户名的帖子链接，才能读取发布结果。",422)
+        account = store.get("x_username", "")
+        if author and account and author.lower() != account.lower():
+            fail("发布链接的账号与当前连接账号不一致。", 422)
         with store.db(True) as c:
             row = c.execute(
-                "SELECT status,post_id FROM drafts WHERE id=?", (draft_id,)
+                "SELECT status,post_id,kind,result_url FROM drafts WHERE id=?", (draft_id,)
             ).fetchone()
             if not row:
                 fail("草稿不存在", 404)
             if row["status"] == "archived":
                 fail("已归档的草稿不能确认完成", 409)
+            if row['status'] == 'confirmed' and not url and row['result_url']:
+                url = row['result_url']
+                match = re.fullmatch(r"https://x\.com/([A-Za-z0-9_]{1,15})/status/(\d{1,30})", url)
+                author, tweet_id = (match.group(1),match.group(2)) if match else (None,None)
+            publication_kind = body.publication_kind or ('reply' if row['kind'] == 'reply' else 'post')
+            if row["kind"] == 'reply' and publication_kind != 'reply':
+                fail("回复草稿只能关联回复帖。", 422)
+            if row["kind"] != 'reply' and publication_kind == 'reply':
+                fail("原创草稿不能关联回复帖。", 422)
+            now = int(time.time())
             c.execute(
                 "UPDATE drafts SET status='confirmed',result_url=?,updated=? WHERE id=?",
-                (url, int(time.time()), draft_id),
+                (url, now, draft_id),
             )
+            c.execute("""INSERT INTO draft_publications(draft_id,tweet_id,url,author,user_confirmed,user_confirmed_at,publication_kind)
+                VALUES(?,?,?,?,1,?,?) ON CONFLICT(draft_id) DO UPDATE SET
+                tweet_id=excluded.tweet_id,url=excluded.url,author=excluded.author,
+                user_confirmed=1,user_confirmed_at=COALESCE(draft_publications.user_confirmed_at,excluded.user_confirmed_at),
+                platform_observed_at=CASE WHEN draft_publications.tweet_id=excluded.tweet_id THEN draft_publications.platform_observed_at ELSE NULL END,
+                published_at=CASE WHEN draft_publications.tweet_id=excluded.tweet_id THEN draft_publications.published_at ELSE NULL END,
+                observation_source=CASE WHEN draft_publications.tweet_id=excluded.tweet_id THEN draft_publications.observation_source ELSE NULL END,
+                publication_kind=excluded.publication_kind""",
+                (draft_id,tweet_id,url or None,author,now,publication_kind))
             if row["post_id"]:
                 c.execute(
                     "UPDATE posts SET status='handled' WHERE id=?", (row["post_id"],)
@@ -1092,6 +1279,57 @@ def create_app(state_dir=None, public_url=None):
                 "confirmed", "用户确认已完成（未经平台验证）", {"draft_id": draft_id}, c
             )
         return {"status": "confirmed", "verified": False}
+
+    @app.get("/api/v1/growth", dependencies=[Depends(session)])
+    def growth():
+        goal = store.rows("SELECT target_followers,created_at,updated_at FROM growth_goals WHERE id=1")
+        latest = store.rows("SELECT followers,observed_at,day,bio,pinned_tweet_id FROM profile_snapshots WHERE account=? ORDER BY observed_at DESC LIMIT 1", (store.get('x_username',''),))
+        follower_count = latest[0]['followers'] if latest else None
+        return {'goal': goal[0] if goal else None, 'profile': latest[0] if latest else None,
+                'remaining': max(0,goal[0]['target_followers']-follower_count) if goal and follower_count is not None else None}
+
+    @app.put("/api/v1/growth/goal", dependencies=[Depends(session)])
+    def set_growth_goal(body: GrowthGoal):
+        now = int(time.time())
+        with store.db(True) as c:
+            c.execute("INSERT INTO growth_goals(id,target_followers,created_at,updated_at) VALUES(1,?,?,?) ON CONFLICT(id) DO UPDATE SET target_followers=excluded.target_followers,updated_at=excluded.updated_at",
+                      (body.target_followers,now,now))
+            store.event('goal','已更新涨粉目标',{'target_followers':body.target_followers},c)
+        return growth()
+
+    @app.post("/api/v1/growth/read", dependencies=[Depends(session)])
+    def read_growth():
+        from .browser_reads import BrowserReads
+        if not BrowserReads(store).connected(8):
+            fail("连接助手需要更新至 1.3.8，才能读取账号数据。", 409)
+        try:
+            return {'task_id': jobs.enqueue('profile_metric',{},dedupe='profile:manual')}
+        except JobError as exc:
+            fail(exc.code,409)
+
+    @app.get("/api/v1/drafts/{draft_id}/metrics", dependencies=[Depends(session)])
+    def draft_metrics(draft_id: str):
+        publication = store.rows("SELECT * FROM draft_publications WHERE draft_id=?",(draft_id,))
+        if not publication:
+            if not store.rows("SELECT id FROM drafts WHERE id=?",(draft_id,)): fail("草稿不存在",404)
+            return {'publication':None,'snapshots':[]}
+        tweet_id = publication[0]['tweet_id']
+        snapshots = store.rows("SELECT observed_at,published_at,age_seconds,target_window,window_status,source,views,likes,replies,reposts,quotes,bookmarks FROM post_metric_snapshots WHERE tweet_id=? ORDER BY observed_at DESC",(tweet_id,)) if tweet_id else []
+        return {'publication':publication[0],'snapshots':snapshots}
+
+    @app.post("/api/v1/drafts/{draft_id}/metrics/read", dependencies=[Depends(session)])
+    def read_draft_metrics(draft_id: str):
+        from .browser_reads import BrowserReads
+        publication = store.rows("SELECT tweet_id,author FROM draft_publications WHERE draft_id=? AND user_confirmed=1",(draft_id,))
+        if not publication: fail("请先确认发布并填写帖子链接。",409)
+        if not publication[0]['tweet_id'] or not publication[0]['author']:
+            fail("请先补充你发布后的帖子链接。",409)
+        if not BrowserReads(store).connected(8):
+            fail("连接助手需要更新至 1.3.8，才能读取帖子数据。",409)
+        try:
+            return {'task_id': jobs.enqueue('metric',{'tweet_id':publication[0]['tweet_id'],'target_window':'baseline'},dedupe='metric:manual:'+publication[0]['tweet_id'])}
+        except JobError as exc:
+            fail(exc.code,409)
 
     @app.post("/api/v1/drafts/{draft_id}/archive", dependencies=[Depends(session)])
     def archive(draft_id: str):

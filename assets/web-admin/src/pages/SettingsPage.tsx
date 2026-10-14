@@ -234,6 +234,8 @@ export default function SettingsPage({
     [cookies, setCookies] = useState<unknown[] | null>(null),
     [owner, setOwner] = useState(data.connections.telegram.owner_id),
     [tg, setTg] = useState(""),
+    [supabaseUrl, setSupabaseUrl] = useState(data.connections.supabase.url),
+    [supabaseKey, setSupabaseKey] = useState(""),
     [enabled, setEnabled] = useState(data.connections.telegram.enabled),
     [settings, setSettings] = useState({
       brand: s.brand,
@@ -247,6 +249,9 @@ export default function SettingsPage({
   useEffect(() => {
     setUsername(data.connections.x.username);
   }, [data.connections.x.username]);
+  useEffect(() => {
+    setSupabaseUrl(data.connections.supabase.url);
+  }, [data.connections.supabase.url]);
   return (
     <>
       <Heading
@@ -276,6 +281,7 @@ export default function SettingsPage({
             {data.connections.x.username || "尚未连接"}
           </p>
           <p>Telegram：{label(data.connections.telegram.status)}</p>
+          <p>Supabase：{data.connections.supabase.configured ? "已配置" : "待配置"} · 待补传 {data.connections.supabase.queued} 次读取</p>
           <p>
             请在{" "}
             <a href="http://127.0.0.1:18880" target="_blank" rel="noreferrer">
@@ -499,6 +505,33 @@ export default function SettingsPage({
             >
               删除 Telegram 凭据
             </button>
+          </section>
+          <section className="surface">
+            <div className="section-title">
+              <h2>Supabase 分析数据</h2>
+              <Badge tone={data.connections.supabase.configured ? "green" : ""}>
+                {data.connections.supabase.configured ? "已配置" : "待配置"}
+              </Badge>
+            </div>
+            <p className="description">分析数据在本机采集后补传。项目密钥只保存在这台电脑，不交给网页或连接助手。</p>
+            <p className="muted">待补传 {data.connections.supabase.queued} 次读取 · 已同步 {data.connections.supabase.synced} 次读取</p>
+            <p className="muted">最近补传：{data.connections.supabase.last_checked_at ? time(data.connections.supabase.last_checked_at) : "尚未运行"} · {({ synced: "成功", retry: "失败后等待重试", idle: "没有待传数据", pending: "等待后台检查", not_configured: "待配置", internal_error: "本机任务出错" } as Record<string, string>)[data.connections.supabase.last_status] || data.connections.supabase.last_status}{data.connections.supabase.last_error ? `（${data.connections.supabase.last_error}）` : ""}</p>
+            <form className="form-stack" onSubmit={(event) => {
+              event.preventDefault();
+              void actions.run(async () => {
+                await api("/connections/supabase", "PUT", { url: supabaseUrl, secret_key: supabaseKey });
+                setSupabaseKey("");
+              }, "Supabase 连接已保存在本机");
+            }}>
+              <Field label="Supabase 项目地址" hint="例如 https://你的项目.supabase.co">
+                <input type="url" value={supabaseUrl} onChange={(event) => setSupabaseUrl(event.target.value)} required />
+              </Field>
+              <Field label="Secret key" hint={data.connections.supabase.configured ? "已保存；同一项目换密钥时填写新值，留空保持原值。" : "使用项目的 sb_secret_ 密钥；只保存在本机。"}>
+                <input type="password" autoComplete="new-password" value={supabaseKey} onChange={(event) => setSupabaseKey(event.target.value)} placeholder="sb_secret_…" />
+              </Field>
+              <Button type="submit"><Save size={15} />保存 Supabase 连接</Button>
+            </form>
+            {data.connections.supabase.configured && <button className="text-button danger spaced-small" onClick={() => void actions.run(() => api("/connections/supabase", "DELETE"), "已移除 Supabase 连接；本机待传数据保留")}>移除连接</button>}
           </section>
         </div>
       )}

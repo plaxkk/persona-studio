@@ -147,6 +147,11 @@ export type Draft = {
   created: number;
   updated: number;
   result_url: string;
+  tweet_id?: string | null;
+  user_confirmed_at?: number | null;
+  platform_observed_at?: number | null;
+  published_at?: number | null;
+  publication_kind?: "post" | "quote" | "reply" | null;
   source_url?: string;
   source_text?: string;
   source_author?: string;
@@ -163,6 +168,15 @@ export type Connections = {
     enabled: boolean;
     status: string;
     credentials: Record<string, boolean>;
+  };
+  supabase: {
+    url: string;
+    configured: boolean;
+    queued: number;
+    synced: number;
+    last_status: string;
+    last_checked_at: number;
+    last_error: string;
   };
 };
 export type Message = {
