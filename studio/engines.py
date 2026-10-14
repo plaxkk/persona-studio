@@ -448,10 +448,92 @@ class CodexEngine(ProcessEngine):
                 raise EngineError("invalid_output")
 
 
+class ClaudeEngine(ProcessEngine):
+    """Local Claude Code writing on this machine's own login; text only, no tools."""
+    id = "claude"
+
+    def local_config(self):
+        from .claude_code import preflight
+        info = preflight()
+        if not info["ready"]:
+            raise EngineError("claude_not_ready")
+        return {"model": info["model"], "auth": "claude-code",
+                "revision": uuid.uuid4().hex}
+
+    def detect(self):
+        from .claude_code import preflight
+        if time.monotonic() - getattr(self, "_checked", -100) > 30:
+            self._info = preflight()
+            self._checked = time.monotonic()
+        info = self._info
+        return {"installed": info["installed"], "supported": True,
+                "login_ready": info["ready"], "local_model": info["model"],
+                "message": info["message"], "auth": "claude-code"}
+
+    def validate(self, config):
+        self.local_config()
+        if config.get("auth") != "claude-code":
+            raise EngineError("claude_not_ready")
+
+    async def execute(self, request, config, task_id):
+        from .claude_code import command, environment, failed, structured
+        await asyncio.to_thread(self.validate, config)
+        # The prompt travels on stdin, so no persona text reaches the process list.
+        with tempfile.TemporaryDirectory(prefix="studio-claude-writing-") as tmp:
+            try:
+                raw = await self.process(
+                    command({
+                        "type": "object", "properties": {"text": {"type": "string"}},
+                        "required": ["text"], "additionalProperties": False,
+                    }),
+                    environment(),
+                    sanitize(prompt_for(request), self.secrets.all().values()),
+                    task_id,
+                    Path(tmp),
+                )
+            except EngineError as exc:
+                if exc.code == "engine_failed":
+                    raise EngineError("claude_failed") from exc
+                raise
+            try:
+                data = None
+                for line in raw.splitlines():
+                    try:
+                        candidate = json.loads(line)
+                    except ValueError:
+                        continue
+                    if isinstance(candidate, dict) and candidate.get("type") == "result":
+                        data = candidate
+                if data is None:
+                    raise ValueError()
+                # A run that reported its own failure gets the retryable answer;
+                # only a shape this product cannot trust is invalid output.
+                if failed(data):
+                    raise EngineError("claude_failed")
+                # No tool is offered to the model, so a denial means this run left
+                # the text-only contract and its output cannot be trusted.
+                if data.get("permission_denials"):
+                    raise ValueError()
+                text = structured(data)
+                if not text:
+                    raise ValueError()
+                usage = data.get("usage") or {}
+                return EngineResult(
+                    sanitize(text, self.secrets.all().values()),
+                    self.id,
+                    {k: v for k, v in usage.items() if isinstance(v, (int, float))},
+                )
+            except (ValueError, TypeError, AttributeError):
+                raise EngineError("invalid_output")
+
+
 class Engines:
     def __init__(self, store):
         self.store = store
-        self.adapters = {e.id: e(store) for e in [HermesEngine, OpenClawEngine, CodexEngine]}
+        self.adapters = {
+            e.id: e(store)
+            for e in [HermesEngine, OpenClawEngine, CodexEngine, ClaudeEngine]
+        }
 
     def config(self, engine):
         rows = self.store.rows("SELECT config FROM engines WHERE id=?", (engine,))
@@ -468,15 +550,4 @@ class Engines:
                 Secrets(self.store.root).get(f"ENGINE_{engine.upper()}_API_KEY")
             )
             rows.append(item)
-        return rows + [
-            {
-                "id": key,
-                "supported": False,
-                "installed": False,
-                "status": "planned",
-                "config": {},
-                "key_present": False,
-                "checked": 0,
-            }
-            for key in ["claude"]
-        ]
+        return rows

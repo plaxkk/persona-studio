@@ -17,6 +17,9 @@ _KEYS = {
     "telegram": ["TELEGRAM_BOT_TOKEN"],
     "hermes": ["ENGINE_HERMES_API_KEY"],
     "openclaw": ["ENGINE_OPENCLAW_API_KEY"],
+    # Codex and Claude Code run on the machine's own login: there is nothing of
+    # theirs to store, so the scope exists only so `delete`/`present` can answer.
+    "claude": [],
     "supabase": ["SUPABASE_SECRET_KEY"],
 }
 _lock = threading.RLock()

@@ -9,7 +9,7 @@ import {
   Download,
   ChevronRight,
 } from "lucide-react";
-import { api, label, time } from "../api";
+import { api, engineName, label, time } from "../api";
 import type { Studio, Actions, Engine } from "../types";
 import { Heading, Field, Button, Badge } from "../components/UI";
 function EngineCard({
@@ -38,41 +38,55 @@ function EngineCard({
   if (!engine.supported)
     return (
       <div className="engine-planned">
-        <strong>{engine.id === "codex" ? "Codex" : "Claude Code"}</strong>
+        <strong>{engineName(engine.id)}</strong>
         <Badge>后续接入</Badge>
       </div>
     );
-  if (engine.id === "codex")
+  // Codex and Claude Code both write on this machine's own CLI login. Neither
+  // takes an API key, and both read their model from that CLI's own settings,
+  // so the card shows what the local tool resolved to instead of a form.
+  if (engine.id === "codex" || engine.id === "claude") {
+    const name = engineName(engine.id);
     return (
       <article className={`engine-card ${active ? "selected" : ""}`}>
         <div className="section-title">
-          <h3>Codex</h3>
+          <h3>{name}</h3>
           <Badge tone={active && engine.status === "ready" && engine.login_ready ? "green" : ""}>
             {active ? (engine.status === "ready" && engine.login_ready ? "正在使用" : "已选择 · 尚未就绪") : label(engine.status)}
           </Badge>
         </div>
-        <p className="description">使用本机 Codex 的 ChatGPT 登录，无需 DeepSeek 余额或 API Key。原创、回复和试聊都走这条链路。</p>
+        <p className="description">
+          {engine.id === "codex"
+            ? "使用本机 Codex 的 ChatGPT 登录，无需 DeepSeek 余额或 API Key。原创、回复和试聊都走这条链路。"
+            : "使用本机已登录的 Claude Code，无需 API Key。模型由你自己那份 Claude Code 设置决定，这里只如实显示检测结果。"}
+        </p>
         <p className="muted">{engine.message}</p>
         <p>本机模型：{engine.local_model || "尚未检测"}</p>
-        {engine.config.model && <p className="muted">写作配置：{engine.config.model} · {engine.config.reasoning}</p>}
+        {engine.config.model && (
+          <p className="muted">
+            写作配置：{engine.config.model}
+            {engine.config.reasoning ? " · " + engine.config.reasoning : ""}
+          </p>
+        )}
         <p className="muted">测试连接会同步本机模型设置。调用失败时保留任务错误，不会自动换用其他服务。</p>
         <div className="actions spaced-small">
           <Button disabled={!engine.installed || !engine.login_ready}
-            onClick={() => void actions.run(() => api("/engines/codex/verify", "POST", {}), "已开始 Codex 真实连接测试")}>
+            onClick={() => void actions.run(() => api(`/engines/${engine.id}/verify`, "POST", {}), `已开始 ${name} 真实连接测试`)}>
             <Plug size={15} />测试连接
           </Button>
           {!active && <Button disabled={engine.status !== "ready" || !engine.login_ready}
-            onClick={() => void actions.run(() => api("/engines/codex/select", "POST", {}), "后续任务将使用 Codex")}>
-            切换到 Codex
+            onClick={() => void actions.run(() => api(`/engines/${engine.id}/select`, "POST", {}), `后续任务将使用 ${name}`)}>
+            切换到 {name}
           </Button>}
         </div>
         {engine.checked > 0 && <small className="muted">最近测试：{time(engine.checked)}</small>}
       </article>
     );
+  }
   return (
     <article className={`engine-card ${active ? "selected" : ""}`}>
       <div className="section-title">
-        <h3>{engine.id === "hermes" ? "Hermes" : "OpenClaw"}</h3>
+        <h3>{engineName(engine.id)}</h3>
         {active ? (
           <Badge tone={engine.status === "ready" && configured ? "green" : ""}>
             <Check size={13} />

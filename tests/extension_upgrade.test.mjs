@@ -6,17 +6,19 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','1.3.14','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.4.0','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','1.3.14','1.4.0','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.4.1','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
-test('Codex verification and selection allowed, credential writes still denied',()=>{
- for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
- for(const path of ['/engines/codex','/engines/codex/credentials','/connections/x','/shell']) {
-  assert.equal(allowedRoute(path,'PUT'),false);
-  assert.equal(allowedRoute(path,'POST'),false);
+test('Codex and Claude Code verification and selection allowed, credential writes still denied',()=>{
+ for(const engine of ['codex','claude']) {
+  for(const path of ['/engines/'+engine+'/verify','/engines/'+engine+'/select']) assert.equal(allowedRoute(path,'POST'),true,path);
+  for(const path of ['/engines/'+engine,'/engines/'+engine+'/credentials','/connections/x','/shell']) {
+   assert.equal(allowedRoute(path,'PUT'),false,path);
+   assert.equal(allowedRoute(path,'POST'),false,path);
+  }
+  assert.equal(isUpgradeRelatedRoute('/engines/'+engine+'/verify'),true);
+  assert.equal(isUpgradeRelatedRoute('/engines/'+engine+'/credentials'),false);
  }
- assert.equal(isUpgradeRelatedRoute('/engines/codex/verify'),true);
- assert.equal(isUpgradeRelatedRoute('/engines/codex/credentials'),false);
 });
 test('connected handshake reports installed version and forwards Codex verification',async()=>{
  globalThis.chrome={runtime:{getManifest:()=>({version:EXTENSION_VERSION})},storage:{session:{get:async()=>({device:{local:'http://127.0.0.1:18880',token:'synthetic-device',expires:Date.now()/1000+300}})}}};

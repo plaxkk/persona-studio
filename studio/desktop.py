@@ -36,7 +36,7 @@ def desktop_route(path, method):
     if method == "POST":
         return bool(
             re.fullmatch(
-                r"/api/v1/(auth/logout|pause|persona/(feedback|corpus)|engines/(hermes|openclaw|codex)/(verify|select)|sync|growth/read|analytics/(content/(read|backfill)|overview/read)|interactions/(skills|[0-9]+/(ignore|context))|generate|creations(/[a-f0-9]{32}/(turn|finalize|media(/[a-f0-9]{32}/(chunks|complete))?))?|reports/weekly/generate|benchmarks/(accounts|read/[A-Za-z0-9_]{1,15}|deconstruct/[0-9]{1,25})|accounts/(quality/read/[A-Za-z0-9_]{1,15}|watchroom/[A-Za-z0-9_]{1,15}/(watch|review))|algorithm/(check|impact/[0-9a-f]{7,40}|watching/(on|off))|tasks/[a-f0-9-]+/cancel|drafts(/[a-f0-9-]+/(opened|confirm|archive|metrics/read))?|backup)",
+                r"/api/v1/(auth/logout|pause|persona/(feedback|corpus)|engines/(hermes|openclaw|codex|claude)/(verify|select)|sync|growth/read|analytics/(content/(read|backfill)|overview/read)|interactions/(skills|[0-9]+/(ignore|context))|generate|creations(/[a-f0-9]{32}/(turn|finalize|media(/[a-f0-9]{32}/(chunks|complete))?))?|reports/weekly/generate|benchmarks/(accounts|read/[A-Za-z0-9_]{1,15}|deconstruct/[0-9]{1,25})|accounts/(quality/read/[A-Za-z0-9_]{1,15}|watchroom/[A-Za-z0-9_]{1,15}/(watch|review))|algorithm/(check|impact/[0-9a-f]{7,40}|watching/(on|off))|tasks/[a-f0-9-]+/cancel|drafts(/[a-f0-9-]+/(opened|confirm|archive|metrics/read))?|backup)",
                 path,
             )
         )

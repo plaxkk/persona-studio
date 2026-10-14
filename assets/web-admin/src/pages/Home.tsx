@@ -188,7 +188,7 @@ export default function Home({
           <Step
             done={engine?.status === "ready"}
             title="选择写作引擎"
-            description="Codex、OpenClaw 或 Hermes，可随时切换。"
+            description="Codex、Claude Code、OpenClaw 或 Hermes，可随时切换。"
             onClick={() => actions.navigate("settings")}
           />
           <Step

@@ -1,4 +1,4 @@
-export const EXTENSION_VERSION = "1.4.0";
+export const EXTENSION_VERSION = "1.4.1";
 export const EXTENSION_DOWNLOAD = "/downloads/persona-studio-browser.zip";
 export function extensionNeedsUpdate(version?: string) {
   if (!version || !/^\d+\.\d+\.\d+$/.test(version)) return true;
@@ -11,7 +11,10 @@ export function extensionNeedsUpdate(version?: string) {
 }
 export function isUpgradeRelatedRoute(path: string) {
   return (
-    /^\/engines\/codex\/(verify|select)$/.test(path) ||
+    // 1.4.1 added Claude Code here. The whole engine family has to be listed by
+    // name: `/engines/<id>/credentials` must keep replying "not found" rather
+    // than sending the reader off to update a connector that is already current.
+    /^\/engines\/(hermes|openclaw|codex|claude)\/(verify|select)$/.test(path) ||
     /^\/persona-imports(?:\/|$)/.test(path)
     || /^\/creations(?:\/|$)/.test(path)
     || /^\/interactions(?:\/|$)/.test(path)

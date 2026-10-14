@@ -89,6 +89,8 @@ export const statusLabel: Record<string, string> = {
   engine_failed: "连接失败",
   codex_not_ready: "Codex 登录或模型未就绪，请重新测试连接",
   codex_failed: "Codex 调用失败，请检查登录、额度或网络；未切换服务",
+  claude_not_ready: "本机 claude 未登录或未就绪，请先完成登录再测试连接",
+  claude_failed: "Claude Code 调用失败，请检查登录、额度或网络；未切换服务",
   planned: "后续接入",
   queued: "排队中",
   pending: "待上传",
@@ -108,6 +110,12 @@ export const statusLabel: Record<string, string> = {
   ok: "最近读取成功",
 };
 export const label = (value: string) => statusLabel[value] || value;
+// One place owns engine names: a new engine used to be labelled by a ternary
+// chain, which silently called anything unrecognised OpenClaw.
+export const engineName = (id: string) =>
+  ({ hermes: "Hermes", openclaw: "OpenClaw", codex: "Codex", claude: "Claude Code" })[
+    id
+  ] || id;
 export const time = (value: number) =>
   value
     ? new Date(value * 1000).toLocaleString("zh-CN", {

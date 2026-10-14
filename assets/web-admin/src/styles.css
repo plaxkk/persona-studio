@@ -120,7 +120,14 @@ input[type="checkbox"] {
   padding: 32px 20px 18px;
   display: flex;
   flex-direction: column;
+  /* The nav grew past what a 720px-tall window fits, and this column could neither
+     scroll nor shrink its children: the last entries (设置) sat below the fold with
+     no way to reach them. Children now keep their own height and the column scrolls. */
+  overflow-y: auto;
   z-index: 20;
+}
+.sidebar > * {
+  flex: 0 0 auto;
 }
 .brand {
   display: flex;

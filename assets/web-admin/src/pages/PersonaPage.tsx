@@ -2,7 +2,7 @@ import PersonaImport from "../components/PersonaImport";
 import PersonaHistory from "../components/PersonaHistory";
 import { useState } from "react";
 import { Send, Save, Upload, Sparkles } from "lucide-react";
-import { api } from "../api";
+import { api, engineName } from "../api";
 import type { Studio, Actions, Persona } from "../types";
 import { Heading, Field, Button, Badge } from "../components/UI";
 export default function PersonaPage({
@@ -108,11 +108,7 @@ export default function PersonaPage({
           <section className="surface chat-surface">
             <div className="section-title">
               <h2>和它聊一聊</h2>
-              <Badge>
-                {data.overview.settings.engine === "hermes"
-                  ? "Hermes"
-                  : data.overview.settings.engine === "codex" ? "Codex" : "OpenClaw"}
-              </Badge>
+              <Badge>{engineName(data.overview.settings.engine)}</Badge>
             </div>
             <p className="muted">
               试聊不会发布到 X，暂停自动任务时也可以使用。

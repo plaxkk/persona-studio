@@ -87,7 +87,11 @@ function Workspace({id, data, actions, back}: {id:string; data:Studio; actions:A
     try {const r=await saving.current; if(current.current.idea===c.idea && current.current.candidate===c.candidate) {setIdea(r.idea);setCandidate(r.candidate);current.current={idea:r.idea,candidate:r.candidate,record:r};} else {current.current.record=r;} setRecord(r); return r;} finally {saving.current=null;}
   }
   const saveRef=useRef(save);saveRef.current=save;
-  useEffect(()=>registerSave(()=>saveRef.current()),[id]);
+  // Every navigation flushes the registered saves, and this one cannot write a
+  // record it has not read yet: registering it before load made one click in that
+  // window throw "创作记录尚未加载" and swallow the navigation.
+  const loaded = !!record;
+  useEffect(()=>loaded ? registerSave(()=>saveRef.current()) : undefined,[id,loaded]);
   useEffect(()=>{const guard=(e:BeforeUnloadEvent)=>{const c=current.current;if(c.record && (c.idea!==c.record.idea||c.candidate!==c.record.candidate)){e.preventDefault();e.returnValue="";}};window.addEventListener("beforeunload",guard);return()=>window.removeEventListener("beforeunload",guard);},[]);
   useEffect(()=>{
     if (!record || record.draft_id || busy || running || (idea===record.idea && candidate===record.candidate)) return;
@@ -103,7 +107,8 @@ function Workspace({id, data, actions, back}: {id:string; data:Studio; actions:A
       await reload(); await actions.refresh();
     });
   }
-  if(!record) return <section className="surface"><p>{error||"正在打开创作记录…"}</p><Button onClick={()=>void back()}>返回灵感库</Button></section>;
+  // `perform` so a failure here is shown instead of becoming an unhandled rejection.
+  if(!record) return <section className="surface"><p>{error||"正在打开创作记录…"}</p><Button onClick={()=>void perform(back)}>返回灵感库</Button></section>;
   const final = !!record.draft_id;
   const disabled=busy||running||final;
   const dirty=idea!==record.idea||candidate!==record.candidate;
