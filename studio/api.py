@@ -510,6 +510,9 @@ def create_app(state_dir=None, public_url=None):
             ]
         } | {
             "creation_id": json.loads(row["payload"]).get("creation_id"),
+            # Which post a deconstruction is about, for the same reason the
+            # creation id is here: the panel has to show the right row as busy.
+            "post_id": json.loads(row["payload"]).get("post_id"),
             "message": ERRORS.get(row["error"], ""),
             "result": json.loads(row["result"]),
         }
@@ -1396,6 +1399,12 @@ def create_app(state_dir=None, public_url=None):
     register_creations(app, store, jobs, session, vault)
     from .report_routes import register as register_reports
     register_reports(app, store, jobs, session)
+    from .benchmark_routes import register as register_benchmarks
+    register_benchmarks(app, store, jobs, session)
+    from .account_routes import register as register_accounts
+    register_accounts(app, store, jobs, session)
+    from .algorithm_routes import register as register_algorithm
+    register_algorithm(app, store, jobs, session)
 
     static = ROOT / "assets/web-admin/dist"
     if (static / "assets").exists():

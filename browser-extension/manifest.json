@@ -22,6 +22,11 @@
     "js": ["analytics-capture.js"],
     "run_at": "document_start",
     "world": "MAIN"
+  }, {
+    "matches": ["https://x.com/search*"],
+    "js": ["search-capture.js"],
+    "run_at": "document_start",
+    "world": "MAIN"
   }],
   "externally_connectable": {
     "matches": [

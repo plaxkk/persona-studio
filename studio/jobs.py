@@ -15,6 +15,14 @@ from .analytics_browser_reads import AnalyticsBrowserReads
 from .interactions import candidate_ids, reply_block
 from .weekly import generate as generate_weekly, last_complete_week
 from .weekly import timezone as weekly_timezone
+from .deconstruct import (
+    DeconstructError,
+    deconstruct,
+    measure as deconstruct_measure,
+    request_text as deconstruct_text,
+)
+from . import algorithm_watch
+from .notify import Notifier
 
 
 class JobError(Exception):
@@ -28,7 +36,10 @@ class Jobs:
         self.store = store
         self.engines = Engines(store)
         self.secrets = Secrets(store.root)
+        # worker 在这个对象建好之后把那个 Telegram 客户端补进来（见 worker.py）。
+        self.notifier = Notifier(store)
         self.last_measurement_schedule = 0
+        self.last_algorithm_schedule = 0
 
     def enqueue(self, kind, payload=None, automatic=False, dedupe=None,
                 available=None):
@@ -40,9 +51,11 @@ class Jobs:
                 r["key"]: json.loads(r["value"])
                 for r in c.execute("SELECT * FROM settings")
             }
-            # A weekly report only reads local rows; pausing stops outward
-            # actions, not the diagnosis the user asked for by hand.
-            if cfg["paused"] and kind not in ["chat", "probe", "weekly"]:
+            # A weekly report and a deconstruction only read local rows; pausing
+            # stops outward actions, not the diagnosis the user asked for by
+            # hand. Neither one touches X.
+            if cfg["paused"] and kind not in ["chat", "probe", "weekly", "deconstruct",
+                                              "algorithm_check"]:
                 raise JobError("paused")
             if dedupe:
                 old = c.execute(
@@ -63,7 +76,7 @@ class Jobs:
                 blocked = reply_block(self.store, str(payload.get("post_id") or ""), c)
                 if blocked:
                     raise JobError(blocked)
-            if kind in ["post", "reply", "chat", "probe"]:
+            if kind in ["post", "reply", "chat", "probe", "deconstruct"]:
                 engine = payload.get("engine") or cfg["engine"]
                 if engine not in self.engines.adapters:
                     raise JobError("unsupported_engine")
@@ -72,6 +85,10 @@ class Jobs:
                 ).fetchone()
                 if kind != "probe" and row["status"] != "ready":
                     raise JobError("engine_not_ready")
+                # A deconstruction is only ever asked for by hand, and it is not
+                # a reply, so it must not consume the reply budget by default.
+                if kind == "deconstruct" and automatic:
+                    raise JobError("not_automatic")
                 payload.update(
                     engine=engine,
                     config=json.loads(row["config"]),
@@ -90,6 +107,20 @@ class Jobs:
                     "INSERT INTO generation_ledger VALUES(?,?,?,?)",
                     (ident, day, kind, int(automatic)),
                 )
+            if kind == "algorithm_check" and payload.get("analyze"):
+                # 检查本身只读一个公开仓库，没有引擎也照跑；只有「这意味着什么」那一半
+                # 要引擎。所以引擎没接上只该让这一个开关失败，而不是整条检查停摆。
+                engine = payload.get("engine") or cfg["engine"]
+                if engine not in self.engines.adapters:
+                    raise JobError("unsupported_engine")
+                row = c.execute("SELECT * FROM engines WHERE id=?", (engine,)).fetchone()
+                if row["status"] != "ready":
+                    raise JobError("engine_not_ready")
+                payload.update(engine=engine, config=json.loads(row["config"]),
+                               persona=cfg["persona"])
+                day = datetime.now(ZoneInfo(cfg["timezone"])).date().isoformat()
+                c.execute("INSERT INTO generation_ledger VALUES(?,?,?,?)",
+                          (ident, day, kind, int(automatic)))
             if kind == "sync":
                 if cfg["x_status"] not in ["ready", "partial", "rate_limited"]:
                     raise JobError("x_not_ready")
@@ -128,7 +159,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview", "weekly") else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview", "weekly", "benchmark", "deconstruct", "account_quality", "algorithm_check") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -142,7 +173,7 @@ class Jobs:
                 c.execute("SELECT value FROM settings WHERE key='paused'").fetchone()[0]
             )
             row = c.execute(
-                "SELECT * FROM tasks WHERE status='queued' AND cancel=0 AND available<=? AND (?=0 OR kind IN ('chat','probe','weekly')) ORDER BY created,id LIMIT 1",
+                "SELECT * FROM tasks WHERE status='queued' AND cancel=0 AND available<=? AND (?=0 OR kind IN ('chat','probe','weekly','deconstruct','algorithm_check')) ORDER BY created,id LIMIT 1",
                 (int(time.time()), int(paused)),
             ).fetchone()
             if not row:
@@ -160,7 +191,9 @@ class Jobs:
         return bool(
             rows
             and not rows[0]["cancel"]
-            and (job["kind"] in ["chat", "probe", "weekly"] or not self.store.get("paused"))
+            and (job["kind"] in ["chat", "probe", "weekly", "deconstruct",
+                                 "account_quality", "algorithm_check"]
+                 or not self.store.get("paused"))
         )
 
     def finish(self, job, status, result=None, error=""):
@@ -196,6 +229,10 @@ class Jobs:
         if now - self.last_measurement_schedule >= 60:
             self.last_measurement_schedule = now
             self.schedule_measurements(now)
+        if (self.store.get("algorithm_watch", True)
+                and now - self.last_algorithm_schedule >= 60):
+            self.last_algorithm_schedule = now
+            self.schedule_algorithm(now)
         if self.store.get("x_status") in [
             "ready",
             "partial",
@@ -224,6 +261,32 @@ class Jobs:
                 )
             except JobError:
                 pass
+
+    def schedule_algorithm(self, now):
+        """每天读一次上游仓库（06D）。
+
+        这一条不搭 `schedule_measurements` 的车：它不碰浏览器，也就没有理由跟着插件
+        在不在线一起停——上游动没动和本机插件装没装是两件事。一次读失败（连不上、
+        被限流）等一小时再来，别一天只试一次；读成功就等满一天。
+
+        间隔看的是「检查结果」而不是「任务状态」：一次被限流的检查是**跑完了**的
+        （它记下了自己没读到什么），任务会写成 succeeded，而「上游没动」的任务也是
+        succeeded ——两者在任务表里长得一样，分不出来。真实的结果在状态表里。
+        """
+        key = "algorithm-check"
+        if self.store.rows(
+                "SELECT id FROM tasks WHERE dedupe=? AND status IN ('queued','running')",
+                (key,)):
+            return
+        state = algorithm_watch.upstream(self.store)
+        interval = (3600 if state["last_status"] in algorithm_watch.TRANSIENT
+                    else algorithm_watch.CHECK_INTERVAL)
+        if state["last_checked"] and now - state["last_checked"] < interval:
+            return
+        try:
+            self.enqueue("algorithm_check", {}, automatic=True, dedupe=key)
+        except JobError:
+            pass
 
     def schedule_measurements(self, now):
         browser = BrowserReads(self.store)
@@ -417,6 +480,120 @@ class Jobs:
             raise JobError("cancelled")
         return generate_weekly(self.store, account=account,
                                week_start=job["payload"].get("week_start") or None)
+
+    async def deconstruct(self, job):
+        """Explain one benchmark post, then store the document (06B-2).
+
+        Two halves, deliberately not merged: the measured half is computed from
+        rows already in the database and is always present, and the interpreted
+        half needs the user's own engine. An engine that is down or that answers
+        with prose costs the interpretation and nothing else -- the document is
+        still written, marked as having no judgement in it, rather than filled in
+        with something plausible.
+        """
+        post_id = str(job["payload"].get("post_id") or "")
+        try:
+            measured = deconstruct_measure(self.store, post_id)
+        except DeconstructError:
+            raise JobError("post_missing")
+        if not self.alive(job):
+            raise JobError("cancelled")
+        payload = job["payload"]
+        engine = payload["engine"]
+        adapter = self.engines.adapters[engine]
+        request = EngineRequest(
+            "deconstruct",
+            deconstruct_text(measured[0], measured[1]),
+            payload["persona"],
+        )
+        raw = ""
+        failure = ""
+        try:
+            result = await adapter.execute(request, payload["config"], job["id"])
+            # The document is stored and rendered, so anything the engine echoed
+            # back has to be scrubbed the same way every other engine output is.
+            raw = sanitize(result.text, self.secrets.all().values())
+        except EngineError as exc:
+            if exc.code == "cancelled":
+                raise
+            failure = f"引擎返回 {exc.code}"
+        except Exception:
+            # The engine is a separate process; its failure costs the
+            # interpretation, and the document records that it happened instead
+            # of losing the measured half too.
+            failure = "引擎执行出错"
+        if not self.alive(job):
+            raise JobError("cancelled")
+        return deconstruct(self.store, post_id, raw=raw, engine=engine,
+                           failure=failure, measured=measured)
+
+    async def algorithm_check(self, job):
+        """读一次上游仓库（06D）。
+
+        自动那一天一次的那趟不带 payload，所以这个方法空着手也得能跑。`analyze` 是
+        人从面板上按的「顺便让引擎读一下」，所以引擎那一半失败只该让应答里少一段话，
+        不该把已经读到的事实一起丢掉——事实已经写进表里了。
+        """
+        if not self.alive(job):
+            raise JobError("cancelled")
+        # httpx 是同步的，直接 await 会把单线程的 worker 循环按住最多 20 秒。
+        # 读浏览器状态那几处也是这么让出去的。
+        result = await asyncio.to_thread(algorithm_watch.check, self.store)
+        if not self.alive(job):
+            raise JobError("cancelled")
+        notice = result.get("notice")
+        notify = None
+        if notice:
+            # 「上游动了」和「这一次没查成」都要送出去：查不到上游如果不出声，
+            # 页面会一直安静地显示上一次的状态，看起来像「上游一直没动」。
+            notify = await self.notifier.send(notice["key"], notice["text"],
+                                              notice.get("title"))
+            if result.get("event_id"):
+                algorithm_watch.mark_notified(
+                    self.store, result["event_id"], notify["status"],
+                    f"Telegram：{notify['telegram']}；桌面：{notify['desktop']}")
+        out = {key: value for key, value in result.items() if key != "notice"}
+        out["notify"] = notify
+        if job["payload"].get("analyze") and result.get("event_id"):
+            out["analysis"] = await self.analyze_algorithm(job, result["event_id"])
+        return out
+
+    async def analyze_algorithm(self, job, event_id):
+        """让引擎读一条已经记下的改动。读不出来就把那次失败写进去。
+
+        引擎给的是「这可能意味着什么」，不是事实；所以它答不上来不该改事实那半张表。
+        """
+        row = algorithm_watch.proposal(self.store, event_id)
+        if not row:
+            return {"written": False, "engine": "", "failure": "事件不在了"}
+        payload = job["payload"]
+        engine = payload.get("engine") or self.store.get("engine")
+        if engine not in self.engines.adapters:
+            return {"written": False, "engine": "", "failure": "引擎没接上"}
+        files = row["files_json"] if isinstance(row["files_json"], list) else []
+        request = EngineRequest("algorithm",
+                                algorithm_watch.proposal_text(row, files),
+                                payload.get("persona") or {})
+        raw = ""
+        failure = ""
+        try:
+            result = await self.engines.adapters[engine].execute(
+                request, payload["config"], job["id"])
+            raw = sanitize(result.text, self.secrets.all().values())
+        except EngineError as exc:
+            if exc.code == "cancelled":
+                raise
+            failure = f"引擎返回 {exc.code}"
+        except Exception:
+            failure = "引擎执行出错"
+        if not self.alive(job):
+            raise JobError("cancelled")
+        # 引擎这一栏只在这里写：留空就是「还没让引擎分析」，写了名字才是「它答了」，
+        # 而「让了但它没答」靠 failure 认——三样不能混成两样。
+        algorithm_watch.attach_analysis(self.store, event_id, raw,
+                                        engine if raw else "", failure)
+        return {"written": bool(raw), "engine": engine if raw else "",
+                "failure": failure}
 
     async def generate(self, job):
         payload = job["payload"]
@@ -688,8 +865,12 @@ class Jobs:
                 BrowserReads(self.store).enrich(job, self.alive) if job["kind"] == "context" else
                 BrowserReads(self.store).metric(job, self.alive) if job["kind"] == "metric" else
                 BrowserReads(self.store).profile(job, self.alive) if job["kind"] == "profile_metric" else
+                BrowserReads(self.store).benchmark(job, self.alive) if job["kind"] == "benchmark" else
+                BrowserReads(self.store).quality(job, self.alive) if job["kind"] == "account_quality" else
                 AnalyticsBrowserReads(self.store).read(job, self.alive) if job["kind"] in ("analytics_content", "analytics_overview") else
                 self.weekly(job) if job["kind"] == "weekly" else
+                self.deconstruct(job) if job["kind"] == "deconstruct" else
+                self.algorithm_check(job) if job["kind"] == "algorithm_check" else
                 self.generate(job)
             )
             self.finish(job, "succeeded", result)

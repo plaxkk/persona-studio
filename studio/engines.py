@@ -66,6 +66,16 @@ def prompt_for(req):
         "post": "写一条原创 X 草稿，仅输出正文，不要冒充真人。",
         "reply": "给下面原帖写回复草稿，仅输出正文。如不应互动，仅输出 [SKIP]。",
         "judge": '判断是否适合互动。仅返回 JSON：{"action":"reply|like|repost|quote|follow|skip","reason":"简短理由"}。',
+        # 06B-2 reads someone else's viral post and explains it; it never writes
+        # in that person's voice, so the only output that is useful is the JSON
+        # `studio/deconstruct.py` asked for.
+        "deconstruct": "拆解下面这条别人的推文为什么能传播，仅返回 JSON，不要写成一篇评论。",
+        # 06D reads the upstream algorithm's own commit and says what it might mean
+        # for one account. The facts are already computed; this half is the reading,
+        # so it stays prose and it is allowed to answer "从这些事实里读不出来".
+        "algorithm": ("读下面这条上游算法改动，说清它对一个只发原创帖、靠回复互动的 X 账号"
+                      "可能意味着什么。只写你从这些事实上读得出的；读不出就说读不出，"
+                      "不要编造影响，也不要给发布建议。"),
     }[req.kind]
     return (
         SAFETY

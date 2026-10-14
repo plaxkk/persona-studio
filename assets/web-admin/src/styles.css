@@ -1658,4 +1658,43 @@ summary {
 .weekly-experiment { display: flex; flex-direction: column; gap: 4px; padding: 13px 15px; border: 1px solid var(--border); border-radius: 10px; background: #fbfaf7; overflow-wrap: anywhere; }
 .weekly-experiment small { color: #8d9983; }
 .weekly-unavailable { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; margin: 0; color: #71825f; }
+.bench-query { display: block; font-size: 11px; line-height: 1.9; background: #fbfaf7; border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; overflow-wrap: anywhere; color: #71825f; }
+.bench-posts { display: flex; flex-direction: column; gap: 13px; }
+.bench-post { display: flex; flex-direction: column; gap: 11px; padding: 16px 18px; background: #fbfaf7; border: 1px solid var(--border); border-radius: 11px; }
+.bench-post > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bench-post > header > span:first-child { display: inline-flex; align-items: baseline; gap: 9px; min-width: 0; }
+.bench-post > header small { color: #97a286; font-size: 11px; }
+.bench-badges { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bench-post > p { margin: 0; font-size: 13px; line-height: 1.95; overflow-wrap: anywhere; white-space: pre-wrap; }
+.bench-metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.bench-metrics dt { font-size: 10px; color: #a0ad8e; }
+.bench-metrics dd { margin: 3px 0 0; font-size: 13px; color: #5d6b4d; }
+.bench-post > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* 拆解文档是 Markdown 源文，等宽 + 保留换行才读得清表格与标题层级。 */
+.bench-doc { margin: 0; padding: 14px 16px; font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11.5px; line-height: 1.85; color: #5d6b4d; background: #f4f2ec; border: 1px solid var(--border); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 620px; overflow-y: auto; }
+@media (max-width: 900px) { .bench-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 900px) { .weekly-numbers { grid-template-columns: 1fr; } }
+/* 账号观察的特征层：一行一个特征，左名称、中数值、右「为什么没有值」。
+   比 bench-metrics 的 6 列格子宽，因为这里的理由是成句的。 */
+.section-subtitle { margin: 16px 0 4px; font-size: 13px; letter-spacing: 0.02em; color: #71825f; }
+.quality-features { display: flex; flex-direction: column; }
+.quality-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.6fr); gap: 12px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--border); }
+.quality-row:first-child { border-top: 0; }
+.quality-label { font-size: 12.5px; color: #5d6b4d; }
+.quality-value { font-size: 13px; color: #3f4a33; }
+.quality-note { font-size: 11px; line-height: 1.8; color: #97a286; }
+@media (max-width: 900px) { .quality-row { grid-template-columns: 1fr; gap: 2px; } }
+/* 三个分各自带一份账：每条规则的原话、跑过没有、没跑是因为什么。样式照 quality-*
+   那一组，因为它本来就是同一张表的下半部分。 */
+.score-ledger { display: flex; flex-direction: column; gap: 14px; }
+.score-block .section-subtitle { margin-top: 0; }
+.score-block p { margin: 0 0 6px; font-size: 12px; }
+.score-rules { margin: 0; padding-left: 18px; list-style: disc; }
+.score-rules li { font-size: 11.5px; line-height: 1.9; color: #5d6b4d; }
+/* 风险硬标签的四个码，出现在账号列表和观察室的队列里。它是**结论**而不是
+   备注，所以用徽章的样子，并且把内部码留在旁边——同一个 code 在两个地方出现
+   两个说法，读的人会以为是两件事。 */
+.flag-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.flag-chip { display: inline-flex; align-items: baseline; gap: 6px; background: #fbf3e8; border: 1px solid #e6d3b8; border-radius: 8px; padding: 2px 9px; }
+.flag-chip strong { font-size: 11.5px; font-weight: 600; color: #8a5a20; }
+.flag-chip small { font-size: 10px; color: #b08a5c; }

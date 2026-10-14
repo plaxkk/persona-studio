@@ -37,6 +37,7 @@ export type Settings = {
 };
 export type Task = {
   creation_id?: string;
+  post_id?: string | null;
   id: string;
   kind: string;
   status: string;
@@ -197,6 +198,10 @@ export type Page =
   | "inbox"
   | "compose"
   | "history"
+  | "benchmarks"
+  | "accounts"
+  | "watchroom"
+  | "algorithm"
   | "reports"
   | "settings";
 export type Actions = {

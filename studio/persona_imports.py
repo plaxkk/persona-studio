@@ -6,6 +6,7 @@ import re
 import secrets
 import time
 from fastapi import HTTPException
+from .browser_identity import BASELINE, extension_at_least
 from .security import sanitize, Secrets
 
 ACTIVE = ("queued", "collecting", "distilling")
@@ -101,12 +102,12 @@ class PersonaImports:
         return bool(
             rows
             and rows[0]["seen"] > time.time() - 45
-            and rows[0]["version"].startswith("1.3.")
+            and extension_at_least(rows[0]["version"], BASELINE)
         )
 
     def presence(self, version):
-        if not re.fullmatch(r"1\.3\.\d+", version):
-            error("请更新连接助手至 1.3。")
+        if not extension_at_least(version, BASELINE):
+            error("请更新连接助手。")
         with self.store.db() as c:
             c.execute(
                 "INSERT OR REPLACE INTO persona_browser_presence VALUES(1,?,?)",

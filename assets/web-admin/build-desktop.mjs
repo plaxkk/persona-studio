@@ -11,6 +11,8 @@ const names = [
   "result-chunks.js",
   "analytics-browser.js",
   "analytics-capture.js",
+  "search-browser.js",
+  "search-capture.js",
   "sync-browser.js",
   "persona-page.js",
   "popup.js",

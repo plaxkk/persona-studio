@@ -30,6 +30,28 @@ async function ready(tabId, account, action, expectedUrl = "") {
   return { state: "waiting_browser" };
 }
 
+async function readyAt(tabId, account, action, pathname, previousUrl = "") {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      // The path is compared case-insensitively: X rewrites the address bar to
+      // the account's own capitalisation, which the studio never saw, so an
+      // exact match would wait out the whole poll on a page that is correct.
+      // `previousUrl` is the stale-document guard from `ready()`: after
+      // `tabs.update`, Chrome can still report the *old* page as complete.
+      if (tab.status === "complete" && tab.url !== previousUrl &&
+          new URL(tab.url).pathname.toLowerCase() === pathname.toLowerCase()) {
+        const result = await read(tabId, account, action);
+        if (result.state !== "waiting_browser") return result;
+      }
+    } catch {
+      return { state: "waiting_browser" };
+    }
+    await delay(500);
+  }
+  return { state: "waiting_browser" };
+}
+
 async function clickRoute(tabId, pathname, postOnly = false) {
   try {
     const result = await chrome.scripting.executeScript({
@@ -68,9 +90,15 @@ export async function operateSync(action) {
   const account = String(action.account || "");
   const detail = action.kind === "context_read" || action.kind === "metric_read";
   const profile = action.kind === "profile_read";
-  if (!/^[A-Za-z0-9_]{1,15}$/.test(account) ||
-      (detail ? !/^[A-Za-z0-9_]{1,15}$/.test(action.author || "") || !/^\d+$/.test(action.post_id || "") : !profile && !SOURCES.has(action.source)))
-    return { state: "invalid_request" };
+  const accountRead = action.kind === "account_read";
+  const handle = String(action.handle || "").replace(/^@/, "");
+  const valid = /^[A-Za-z0-9_]{1,15}$/.test(account) &&
+    (detail
+      ? /^[A-Za-z0-9_]{1,15}$/.test(action.author || "") && /^\d+$/.test(action.post_id || "")
+      : accountRead
+        ? /^[A-Za-z0-9_]{1,15}$/.test(handle)
+        : profile || SOURCES.has(action.source));
+  if (!valid) return { state: "invalid_request" };
   const saved = (await chrome.storage.session.get(TAB_KEY))[TAB_KEY];
   let tab;
   if (saved?.tab) {
@@ -108,6 +136,23 @@ export async function operateSync(action) {
     const url = `https://x.com/${account}`;
     if (tab.url !== url) await chrome.tabs.update(tab.id, { url });
     return ready(tab.id, account, { kind: 'profile_snapshot' });
+  }
+  if (accountRead) {
+    const path = `/${handle}`;
+    // Navigate only when the route actually differs, so a re-read does not
+    // reload the page it is already on -- and so the stale-document guard below
+    // stays meaningful: with no navigation there is no previous page whose
+    // loaded DOM could be read as this one.
+    const navigated =
+      new URL(tab.url).pathname.toLowerCase() !== path.toLowerCase();
+    if (navigated) await chrome.tabs.update(tab.id, { url: `https://x.com/${handle}` });
+    const result = await readyAt(tab.id, account, { kind: "account_snapshot", handle },
+      path, navigated ? tab.url : "");
+    if (result.state !== "ready") return result;
+    // The page cannot answer for a different account than the one asked for.
+    if (String(result.handle || "").toLowerCase() !== handle.toLowerCase())
+      return { state: "source_error" };
+    return result;
   }
   const url = sourceUrl(action.source, account);
   if (tab.url !== url) {

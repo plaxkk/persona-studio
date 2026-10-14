@@ -21,6 +21,66 @@ export async function readPersonaPage(action, expected) {
           ? "waiting_login"
           : "waiting_browser",
     };
+  // §4.11 needs the *engager's* profile, which is somebody else's page. This is
+  // the one read in this file that is not about the signed-in account, so it
+  // runs before the mismatch branch — but only that branch is skipped. The
+  // nav-bar link above is still required, because it is the proof that a
+  // session is open: signed out, X serves the logged-out shell, whose "profile"
+  // is a login prompt and whose numbers are all absent.
+  if (action.kind === "account_snapshot") {
+    const target = String(action.handle || "").replace(/^@/, "");
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(target)) return { state: "invalid_request" };
+    if (location.pathname.toLowerCase() !== `/${target.toLowerCase()}`)
+      return { state: "source_error" };
+    if (!primary) return { state: "waiting_browser" };
+    // X writes hrefs with the account's own capitalisation, so the header links
+    // are matched case-insensitively instead of by a selector built from the
+    // lowercased handle; it has to be the target's own link, not a follower
+    // card's, or a small account's followers number would be read as its own.
+    const link = (suffix) =>
+      [...primary.querySelectorAll(`a[href$="/${suffix}"]`)].find((node) => {
+        const match = node
+          .getAttribute("href")
+          ?.match(/^\/([A-Za-z0-9_]{1,15})\/(?:verified_)?(followers|following)$/);
+        return match && match[1].toLowerCase() === target.toLowerCase();
+      });
+    const followersLink = link("followers");
+    if (!followersLink) return { state: "waiting_browser" };
+    // Abbreviated values such as 1.2K are unknown, never rounded into a count.
+    const count = (node, words) => {
+      const label = node?.getAttribute("aria-label") || node?.innerText || "";
+      const match = label.match(new RegExp(`(?:^|\\s)([\\d,]+)\\s*(?:${words})`, "i"));
+      return match ? Number(match[1].replaceAll(",", "")) : null;
+    };
+    const avatar = primary.querySelector(
+      '[data-testid^="UserAvatar-Container-"] img',
+    );
+    return {
+      state: "ready",
+      account,
+      handle: target,
+      page: location.pathname,
+      record: {
+        name: primary.querySelector('[data-testid="UserName"]')?.innerText || "",
+        bio: primary.querySelector('[data-testid="UserDescription"]')?.innerText || "",
+        location: primary.querySelector('[data-testid="UserLocation"]')?.innerText || "",
+        url: primary.querySelector('[data-testid="UserUrl"]')?.innerText || "",
+        joined: primary.querySelector('[data-testid="UserJoinDate"]')?.innerText || "",
+        followers: count(followersLink, "Followers|粉丝"),
+        following: count(link("following"), "Following|正在关注|关注"),
+        // The header carries no post total. Reporting the field as absent, with
+        // why, keeps it from being read later as "this account has 0 posts".
+        posts_count: null,
+        posts_count_reason: "主页头图区不显示帖子总数",
+        has_avatar: !!avatar,
+        default_avatar: /default_profile_images/.test(
+          avatar?.getAttribute("src") || "",
+        ),
+        has_banner: !!primary.querySelector('a[href$="/header_photo"]'),
+        verified: !!primary.querySelector('[data-testid="icon-verified"]'),
+      },
+    };
+  }
   if (account.toLowerCase() !== expected.toLowerCase())
     return { state: "account_mismatch", account };
   if (!primary) return { state: "waiting_browser" };

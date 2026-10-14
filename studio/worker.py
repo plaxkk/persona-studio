@@ -29,6 +29,9 @@ async def serve(store):
     jobs = Jobs(store)
     jobs.recover()
     telegram = Telegram(store, jobs)
+    # 06D 的通知走的是这同一个 Telegram 客户端：进程里只留一条通往 Telegram 的路，
+    # 免得两处各自持一份 token、各自重试。
+    jobs.notifier.telegram = telegram
     importer = CodexPersonaRunner(store)
     importer.recover()
     importer.imports.cleanup()

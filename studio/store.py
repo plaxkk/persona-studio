@@ -31,6 +31,10 @@ DEFAULTS = dict(
     supabase_url="",
     analytics_cloud_last_status="not_configured",
     analytics_cloud_checked_at=0,
+    # 06D：盯哪个上游、要不要自动盯。默认盯 X 官方开源的那份排序算法，默认开着——
+    # 所以这个开关在页面上看得见、也关得掉。
+    algorithm_repo="xai-org/x-algorithm",
+    algorithm_watch=True,
 )
 PERSONA = dict(
     name="未命名的角色",
@@ -345,6 +349,240 @@ class Store:
                     PRIMARY KEY(experiment_id,day,metric,source));
                 """)
                 c.execute("INSERT INTO migrations VALUES(10,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=11").fetchone():
+                # Benchmark posts (06B). `metrics_json` holds only the counts X
+                # actually published; a withheld count is listed in
+                # `engagement_json.unknown` and never written as 0. `posted_at`
+                # is nullable for the same reason, and `coverage_gap` records
+                # what the read did not reach instead of implying completeness.
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS benchmark_accounts(
+                    handle TEXT PRIMARY KEY,
+                    label TEXT NOT NULL DEFAULT '',
+                    note TEXT NOT NULL DEFAULT '',
+                    added_at INTEGER NOT NULL,
+                    active INTEGER NOT NULL DEFAULT 1);
+                CREATE TABLE IF NOT EXISTS benchmark_posts(
+                    post_id TEXT PRIMARY KEY, handle TEXT NOT NULL,
+                    author TEXT NOT NULL DEFAULT '',
+                    text TEXT NOT NULL DEFAULT '',
+                    text_source TEXT NOT NULL DEFAULT '',
+                    url TEXT NOT NULL DEFAULT '', posted_at INTEGER,
+                    kind TEXT NOT NULL DEFAULT '',
+                    metrics_json TEXT NOT NULL DEFAULT '{}',
+                    engagement_json TEXT NOT NULL DEFAULT '{}',
+                    is_viral INTEGER NOT NULL DEFAULT 0,
+                    captured_at INTEGER NOT NULL,
+                    source TEXT NOT NULL DEFAULT '',
+                    coverage_gap TEXT NOT NULL DEFAULT '');
+                CREATE INDEX IF NOT EXISTS benchmark_posts_handle
+                    ON benchmark_posts(handle,posted_at);
+                CREATE TABLE IF NOT EXISTS viral_deconstructions(
+                    id TEXT PRIMARY KEY,
+                    post_id TEXT NOT NULL REFERENCES benchmark_posts(post_id),
+                    handle TEXT NOT NULL, thesis TEXT NOT NULL DEFAULT '',
+                    hook TEXT NOT NULL DEFAULT '',
+                    structure_json TEXT NOT NULL DEFAULT '{}',
+                    evidence TEXT NOT NULL DEFAULT '',
+                    design_doc TEXT NOT NULL DEFAULT '',
+                    engine TEXT NOT NULL DEFAULT '', created INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS search_reads(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL UNIQUE,
+                    handle TEXT NOT NULL, account TEXT NOT NULL,
+                    query TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '{}', updated INTEGER NOT NULL
+                );
+                """)
+                # §4.7.1 names these two accounts to watch, so they are seeded
+                # rather than left for the user to re-type. They start active
+                # but unread: no post row exists until a real search runs.
+                seeded = int(time.time())
+                for handle, label, note in (
+                    ("lifesinger", "Frank Wang 玉伯", "产品需求 §4.7.1 手动录入"),
+                    ("chunxiangai", "赵纯想", "产品需求 §4.7.1 手动录入"),
+                ):
+                    c.execute(
+                        "INSERT OR IGNORE INTO benchmark_accounts"
+                        "(handle,label,note,added_at,active) VALUES(?,?,?,?,1)",
+                        (handle, label, note, seeded),
+                    )
+                c.execute("INSERT INTO migrations VALUES(11,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=12").fetchone():
+                # 账号质量（06C）。五张表照《账号质量打标程序化方案》的流水线
+                # 分层：样本 → 特征 → 特征值 → 分数 → 硬标签，再加一张观察台名单。
+                # 06C-1 只写前两张；后三张现在就建，是为了让"还没算分"表现为一行
+                # 空的 `account_scores`（可渲染成暂无数据），而不是让面板去猜这张表
+                # 该不该存在——这与 v10 里 experiments 随周报一起落地是同一条理由。
+                #
+                # `value REAL` 可空、旁边配 `known`：读不到的观测量必须留空并写清
+                # 为什么，写 0 会让"没有这种情况"和"我们看不到"变成一个数。
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS account_samples(
+                    handle TEXT NOT NULL,
+                    sample_kind TEXT NOT NULL,
+                    sample_id TEXT NOT NULL,
+                    author TEXT NOT NULL DEFAULT '',
+                    text TEXT NOT NULL DEFAULT '',
+                    text_source TEXT NOT NULL DEFAULT '',
+                    url TEXT NOT NULL DEFAULT '',
+                    posted_at INTEGER,
+                    metrics_json TEXT NOT NULL DEFAULT '{}',
+                    engagement_json TEXT NOT NULL DEFAULT '{}',
+                    extra_json TEXT NOT NULL DEFAULT '{}',
+                    captured_at INTEGER NOT NULL,
+                    source TEXT NOT NULL DEFAULT '',
+                    coverage_gap TEXT NOT NULL DEFAULT '',
+                    PRIMARY KEY(handle,sample_kind,sample_id));
+                CREATE INDEX IF NOT EXISTS account_samples_kind
+                    ON account_samples(handle,sample_kind,posted_at);
+                CREATE TABLE IF NOT EXISTS account_features(
+                    id TEXT PRIMARY KEY, handle TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL,
+                    window_days INTEGER NOT NULL,
+                    from_date TEXT NOT NULL, to_date TEXT NOT NULL,
+                    task_id TEXT NOT NULL DEFAULT '',
+                    sample_counts_json TEXT NOT NULL DEFAULT '{}',
+                    coverage_gap TEXT NOT NULL DEFAULT '',
+                    confidence TEXT NOT NULL,
+                    created INTEGER NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS account_features_handle
+                    ON account_features(handle,observed_at);
+                CREATE TABLE IF NOT EXISTS account_feature_values(
+                    feature_id TEXT NOT NULL REFERENCES account_features(id),
+                    name TEXT NOT NULL, label TEXT NOT NULL DEFAULT '',
+                    layer TEXT NOT NULL DEFAULT '', unit TEXT NOT NULL DEFAULT '',
+                    value REAL, known INTEGER NOT NULL,
+                    note TEXT NOT NULL DEFAULT '', sample_size INTEGER,
+                    PRIMARY KEY(feature_id,name));
+                CREATE TABLE IF NOT EXISTS account_scores(
+                    feature_id TEXT PRIMARY KEY REFERENCES account_features(id),
+                    handle TEXT NOT NULL,
+                    authenticity REAL, professionalism REAL, monetization REAL,
+                    confidence TEXT NOT NULL,
+                    rule_version TEXT NOT NULL DEFAULT '',
+                    model_version TEXT NOT NULL DEFAULT '',
+                    labels_json TEXT NOT NULL DEFAULT '{}',
+                    created INTEGER NOT NULL, updated INTEGER NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS account_scores_pending
+                    ON account_scores(cloud_status,cloud_retry_at);
+                CREATE TABLE IF NOT EXISTS account_flags(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    feature_id TEXT NOT NULL REFERENCES account_features(id),
+                    handle TEXT NOT NULL, code TEXT NOT NULL,
+                    layer TEXT NOT NULL DEFAULT '',
+                    evidence TEXT NOT NULL DEFAULT '',
+                    confidence TEXT NOT NULL DEFAULT '',
+                    rule_version TEXT NOT NULL DEFAULT '',
+                    created INTEGER NOT NULL, UNIQUE(feature_id,code));
+                CREATE TABLE IF NOT EXISTS account_watchlist(
+                    handle TEXT PRIMARY KEY, added_at INTEGER NOT NULL,
+                    hits INTEGER NOT NULL DEFAULT 0, last_hit INTEGER,
+                    hits_json TEXT NOT NULL DEFAULT '[]',
+                    status TEXT NOT NULL DEFAULT 'watching',
+                    note TEXT NOT NULL DEFAULT '', action TEXT NOT NULL DEFAULT '',
+                    updated INTEGER NOT NULL);
+                -- 一次账号观察要读主页 + 三个搜索，而 search_reads.task_id 是
+                -- UNIQUE 的，一个任务只能挂一次搜索。队列单独一张表，用
+                -- (task_id,kind) 做键：同一次观察里的四次读取互不挤占，
+                -- 又不会重复排同一种读取。
+                CREATE TABLE IF NOT EXISTS account_reads(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL, kind TEXT NOT NULL,
+                    handle TEXT NOT NULL, account TEXT NOT NULL,
+                    query TEXT NOT NULL DEFAULT '',
+                    status TEXT NOT NULL,
+                    result TEXT NOT NULL DEFAULT '{}', updated INTEGER NOT NULL,
+                    UNIQUE(task_id,kind));
+                """)
+                c.execute("INSERT INTO migrations VALUES(12,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=13").fetchone():
+                # 上游算法跟踪（06D）。三张表分开：上游「上次看到哪儿」的状态、每次
+                # 真的动过的事实、以及人对这次改动的判断。三样不同命：状态每次检查都
+                # 会改，事实一旦写下就不再改，判断只有人能写。
+                #
+                # `intervening` 可空，和别处的 `known` 是同一条约定：0 表示「两次检查
+                # 之间确实没有别的提交」，NULL 表示「有别的提交，但本机数不出有几条」。
+                # 写 0 会把「看不到」说成「没有」。
+                #
+                # `files_total` 也可空：GitHub 一次提交的文件清单最多给 300 条，超过
+                # 就只列前 300 条；总数拿不到时留空，并由 `files_truncated` +
+                # `coverage_gap` 说明这次看到了多少。
+                c.executescript("""
+                CREATE TABLE IF NOT EXISTS algorithm_upstream_state(
+                    repo TEXT PRIMARY KEY,
+                    branch TEXT NOT NULL DEFAULT '',
+                    etag TEXT NOT NULL DEFAULT '',
+                    last_sha TEXT NOT NULL DEFAULT '',
+                    last_commit_at INTEGER,
+                    baseline INTEGER NOT NULL DEFAULT 0,
+                    last_checked INTEGER,
+                    last_ok INTEGER,
+                    last_status TEXT NOT NULL DEFAULT '',
+                    last_note TEXT NOT NULL DEFAULT '',
+                    last_release_tag TEXT NOT NULL DEFAULT '',
+                    checked_count INTEGER NOT NULL DEFAULT 0,
+                    created INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS algorithm_events(
+                    id TEXT PRIMARY KEY,
+                    repo TEXT NOT NULL, sha TEXT NOT NULL,
+                    branch TEXT NOT NULL DEFAULT '',
+                    commit_at INTEGER,
+                    author TEXT NOT NULL DEFAULT '',
+                    message TEXT NOT NULL DEFAULT '',
+                    url TEXT NOT NULL DEFAULT '',
+                    parent_sha TEXT NOT NULL DEFAULT '',
+                    intervening INTEGER,
+                    files_json TEXT NOT NULL DEFAULT '[]',
+                    modules_json TEXT NOT NULL DEFAULT '[]',
+                    files_listed INTEGER NOT NULL DEFAULT 0,
+                    files_total INTEGER,
+                    files_truncated INTEGER NOT NULL DEFAULT 0,
+                    summary TEXT NOT NULL DEFAULT '',
+                    coverage_gap TEXT NOT NULL DEFAULT '',
+                    created INTEGER NOT NULL,
+                    UNIQUE(repo,sha));
+                CREATE INDEX IF NOT EXISTS algorithm_events_repo
+                    ON algorithm_events(repo,created);
+                CREATE TABLE IF NOT EXISTS algorithm_proposals(
+                    event_id TEXT PRIMARY KEY REFERENCES algorithm_events(id),
+                    repo TEXT NOT NULL, sha TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'proposed',
+                    analysis TEXT NOT NULL DEFAULT '',
+                    engine TEXT NOT NULL DEFAULT '',
+                    engine_error TEXT NOT NULL DEFAULT '',
+                    impact TEXT NOT NULL DEFAULT '',
+                    impact_at INTEGER,
+                    notify_status TEXT NOT NULL DEFAULT 'pending',
+                    notify_note TEXT NOT NULL DEFAULT '',
+                    notified_at INTEGER,
+                    created INTEGER NOT NULL, updated INTEGER NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '',
+                    cloud_synced_at INTEGER);
+                CREATE INDEX IF NOT EXISTS algorithm_proposals_cloud
+                    ON algorithm_proposals(cloud_status,cloud_retry_at);
+                """)
+                # 这两个键只写在 `DEFAULTS` 里是到不了老库的：`DEFAULTS` 只在 v1 那一段
+                # 被种下去一次，之后新建的键老库永远没有。而 `jobs.enqueue` 的 `cfg`
+                # 是直接读 settings 全表的，缺一个键就是 KeyError——检查在哪儿都会炸，
+                # 不只是在面板上。所以这里跟着 migration 一起补上。
+                for key, value in (("algorithm_repo", DEFAULTS["algorithm_repo"]),
+                                   ("algorithm_watch", DEFAULTS["algorithm_watch"])):
+                    c.execute("INSERT OR IGNORE INTO settings VALUES(?,?)",
+                              (key, json.dumps(value)))
+                c.execute("INSERT INTO migrations VALUES(13,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

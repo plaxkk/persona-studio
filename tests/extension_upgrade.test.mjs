@@ -93,6 +93,22 @@ test('weekly report routes pass through the extension and nothing wider does',()
  assert.equal(allowedRoute('/reports/weekly/generate','GET'),true);
  assert.equal(allowedRoute('/reports/weekly/generate','POST'),true);
 });
+test('benchmark routes pass through the extension and nothing wider does',()=>{
+ for(const [path,method] of [
+  ['/benchmarks/accounts','GET'],['/benchmarks/accounts','POST'],
+  ['/benchmarks/posts/lifesinger','GET'],['/benchmarks/read/lifesinger','POST']
+ ]) { assert.equal(allowedRoute(path,method),true,path+' '+method);
+      assert.equal(isUpgradeRelatedRoute(path),true,path); }
+ for(const [path,method] of [
+  ['/benchmarks','GET'],['/benchmarks/posts','GET'],
+  ['/benchmarks/posts/lifesinger','POST'],['/benchmarks/read/lifesinger','GET'],
+  ['/benchmarks/posts/lifesinger/export','POST'],['/benchmarks/accounts/delete','POST'],
+  // A query string is refused by the bridge unless the route is on its short
+  // list, which is why the handle travels in the path.
+  ['/benchmarks/posts?handle=lifesinger','GET'],
+  ['/benchmarks/posts/'+'a'.repeat(16),'GET'],['/benchmarks/posts/'+'a b','GET']
+ ]) assert.equal(allowedRoute(path,method),false,path+' '+method);
+});
 test('Subscription analytics read routes are specific and credentials stay local',()=>{
  assert.equal(allowedRoute('/analytics/content','GET'),true);
  assert.equal(allowedRoute('/analytics/content/read','POST'),true);
@@ -101,7 +117,10 @@ test('Subscription analytics read routes are specific and credentials stay local
  assert.equal(allowedRoute('/analytics/content/export','POST'),false);
  assert.equal(allowedRoute('/connections/supabase','PUT'),false);
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
- assert.deepEqual(manifest.content_scripts.map(({world,run_at})=>[world,run_at]),[['MAIN','document_start']]);
+ // Two page collectors, each scoped to its own page kind and both in the MAIN
+ // world: analytics reads its own page, search reads the search result page.
+ assert.deepEqual(manifest.content_scripts.map(({world,run_at})=>[world,run_at]),[['MAIN','document_start'],['MAIN','document_start']]);
+ assert.deepEqual(manifest.content_scripts.map(item=>item.js),[['analytics-capture.js'],['search-capture.js']]);
 });
 test('extension download contains every local script referenced by its manifest and imports',()=>{
  const build=fs.readFileSync(new URL('../assets/web-admin/build-desktop.mjs',import.meta.url),'utf8');

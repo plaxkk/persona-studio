@@ -53,7 +53,7 @@ def register(app, store, session, allowed_hosts):
             result["ready"] and result["browser_connected"] and bool(result["account"])
         )
         if not result["browser_connected"]:
-            result["message"] = "请更新连接助手至 1.3，并在扩展中授权本机连接。"
+            result["message"] = "请更新连接助手，并在扩展中授权本机连接。"
         return result
 
     @app.post("/api/v1/persona-imports", dependencies=auth)
