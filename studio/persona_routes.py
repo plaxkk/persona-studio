@@ -47,7 +47,7 @@ def register(app, store, session, allowed_hosts):
     def check():
         result = preflight()
         result["browser_connected"] = imports.connected()
-        result["required_extension"] = "1.3.0"
+        result["required_extension"] = "1.4.0"
         result["account"] = store.get("x_username", "")
         result["ready"] = (
             result["ready"] and result["browser_connected"] and bool(result["account"])

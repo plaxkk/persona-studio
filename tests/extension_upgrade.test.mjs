@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.3.14','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','1.3.14','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.4.0','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex verification and selection allowed, credential writes still denied',()=>{
  for(const path of ['/engines/codex/verify','/engines/codex/select']) assert.equal(allowedRoute(path,'POST'),true);
@@ -108,6 +108,27 @@ test('benchmark routes pass through the extension and nothing wider does',()=>{
   ['/benchmarks/posts?handle=lifesinger','GET'],
   ['/benchmarks/posts/'+'a'.repeat(16),'GET'],['/benchmarks/posts/'+'a b','GET']
  ]) assert.equal(allowedRoute(path,method),false,path+' '+method);
+});
+// 06C (account observation) and 06D (algorithm watch) each added a route family.
+// Both lists have to know them: `allowedRoute` in the extension, and the upgrade
+// list here. Missing from the upgrade list means an old connector turns a 403
+// into "本机连接已断开，请重新授权" — which sends the reader the wrong way.
+test('account observation and algorithm routes are upgrade related',()=>{
+ for(const [path,method] of [
+  ['/accounts/quality','GET'],['/accounts/quality/lifesinger','GET'],
+  ['/accounts/quality/read/lifesinger','POST'],['/accounts/watchroom','GET'],
+  ['/accounts/watchroom/lifesinger/watch','POST'],
+  ['/accounts/watchroom/lifesinger/review','POST'],
+  ['/accounts/watchroom/lifesinger','DELETE'],
+  ['/algorithm/events','GET'],
+  ['/algorithm/proposals/'+'a'.repeat(32),'GET'],
+  ['/algorithm/check','POST'],['/algorithm/impact/'+'a'.repeat(40),'POST'],
+  ['/algorithm/watching/on','POST'],['/algorithm/watching/off','POST']
+ ]) { assert.equal(allowedRoute(path,method),true,path+' '+method);
+      assert.equal(isUpgradeRelatedRoute(path),true,path); }
+ // Neither family may be widened into a blanket allow. The bare prefix counts
+ // (same as `/benchmarks` above), but a lookalike stem must not.
+ for(const path of ['/account','/accounting','/algorithms']) assert.equal(isUpgradeRelatedRoute(path),false,path);
 });
 test('Subscription analytics read routes are specific and credentials stay local',()=>{
  assert.equal(allowedRoute('/analytics/content','GET'),true);
