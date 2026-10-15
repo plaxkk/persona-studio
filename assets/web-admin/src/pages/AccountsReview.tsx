@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Eye, Trash2, UserPlus } from "lucide-react";
 import { api, time } from "../api";
 import type { Actions } from "../types";
@@ -64,7 +65,7 @@ type Row = {
   authenticity: number | null;
   professionalism: number | null;
   monetization: number | null;
-  // 只留**最近这一次运行**的标签：观察室要说的是「它现在为什么在榜上」，
+  // 只留**最近这一次运行**的标签：复核室要说的是「它现在为什么在榜上」，
   // 一个上次命中、这次已经消失的标不该继续挂着。
   flags: RowFlag[];
 };
@@ -103,13 +104,31 @@ const pct = (value: number) =>
 const score = (value: number | null) =>
   value === null || value === undefined ? NO_DATA : `${value} / 100`;
 
-export default function Watchroom({ actions }: { actions: Actions }) {
+export default function AccountsReview({
+  actions,
+  tabs,
+  active,
+  focus,
+}: {
+  actions: Actions;
+  tabs?: ReactNode;
+  // 自己是不是当前那个标签。不是就不读——这里只是挂着留住人写了一半的复核意见。
+  active: boolean;
+  // 从「看一个号」跳过来时要选中哪个号。传整个对象而不是光传字符串：同一个号
+  // 再跳一次时对象身份变了，effect 才会重跑，不然第二次点就没反应。
+  focus?: { handle: string };
+}) {
   const [ledger, setLedger] = useState<Ledger | null>(null),
     [loading, setLoading] = useState(true),
     [selected, setSelected] = useState(""),
     [note, setNote] = useState(""),
     [action, setAction] = useState(""),
     [handle, setHandle] = useState("");
+
+  // 背景刷新（桌面端每 4 秒一次）和切回标签都会重跑下面那个 effect。用 ref 拿
+  // "人现在看的是谁"，别写进依赖里：写进去就成了每次点一个人就重读一遍。
+  const shown = useRef(selected);
+  shown.current = selected;
 
   const load = useCallback(async (keep?: string) => {
     const next = await api<Ledger>("/accounts/watchroom");
@@ -120,15 +139,41 @@ export default function Watchroom({ actions }: { actions: Actions }) {
       "";
     setSelected(pick);
     // 复核意见跟着选中的人走。换一个人不换草稿，「保存」就会把上一个人的
-    // 说法写到这个人头上。
+    // 说法写到这个人头上。反过来，**还是同一个人就不动它**——后台每几秒重读
+    // 一次，每次都照着库里的值覆盖，等于人正打着字就被抹掉。
     const row = next.watchlist.find((one) => one.handle === pick);
-    setNote(row?.note || "");
-    setAction(row?.action || "");
+    if (pick !== shown.current) {
+      setNote(row?.note || "");
+      setAction(row?.action || "");
+    }
+    // 把实际选中的人交回调用方：队列有上限，想选的那个号不一定在返回的这一屏里，
+    // 调用方要能发现「没选上」，而不是默默停在别人身上。
+    return { pick, cap: next.cap };
   }, []);
 
+  // 跳过来要选的那个人只认一次。不然从看一个号跳过来之后，人自己在队列里换了
+  // 一个人、切出去再切回来，又被拽回那个号上。
+  const jumped = useRef<{ handle: string } | undefined>(undefined);
+
   useEffect(() => {
-    void actions.run(() => load()).finally(() => setLoading(false));
-  }, [actions, load]);
+    if (!active) return;
+    const fresh = focus && focus !== jumped.current ? focus.handle : "";
+    jumped.current = focus;
+    void actions
+      .run(async () => {
+        const { pick, cap } = await load(fresh || shown.current);
+        if (fresh && pick !== fresh) {
+          // 队列按最近命中时间排、只回前 cap 个；手加进来的号还没有命中时间，
+          // 排在所有有命中的号后面，队列满时就不在这屏里了。说清楚，别让人
+          // 以为选中的那个就是刚刚加进去的。
+          actions.notify(
+            `「${fresh}」已经加进来了，但它不在这次列出的前 ${cap} 个里`,
+            true,
+          );
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [actions, load, active, focus]);
 
   const select = (row: Row) => {
     setSelected(row.handle);
@@ -150,7 +195,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
     void actions.run(async () => {
       await api(`/accounts/watchroom/${selected}`, "DELETE");
       await load();
-    }, "已移出观察室，它的历史账也跟着没了");
+    }, "已移出复核室，它的历史账也跟着没了");
 
   const add = () =>
     void actions.run(async () => {
@@ -159,7 +204,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
       });
       setHandle("");
       await load();
-    }, "已加入观察室");
+    }, "已加入复核室");
 
   const rows = ledger?.watchlist || [];
   const board = ledger?.review;
@@ -170,7 +215,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
   return (
     <>
       <Heading
-        eyebrow="06C 账号观察室"
+        eyebrow="06C 账号观察"
         title="被标了的人，人再看一遍"
         description={
           "硬标签命中过的账号会自动落到这里，也可以自己加。这是一本账、不是一个结论：" +
@@ -186,6 +231,9 @@ export default function Watchroom({ actions }: { actions: Actions }) {
           ) : undefined
         }
       />
+      {/* 只有当前这一半长标签行：两半都长的话，藏起来的那一行虽然看不见、也进
+          不了无障碍树，但 DOM 里就是两份同样的 tablist。 */}
+      {active && tabs}
       <div className="stack">
         <section className="surface">
           <div className="section-title">
@@ -197,7 +245,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
             )}
           </div>
           {loading ? (
-            <p className="muted">正在读取观察室…</p>
+            <p className="muted">正在读取复核室…</p>
           ) : !ledger ? (
             <p className="muted">{NO_DATA}</p>
           ) : (
@@ -261,7 +309,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
           </div>
           {!rows.length ? (
             <Empty
-              title="观察室里还没有人"
+              title="复核室里还没有人"
               description="账号读取时命中了硬标签就会自动进来；也可以在上面填一个用户名自己加。"
             />
           ) : (
@@ -317,7 +365,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
             </Field>
             <Button type="submit" disabled={!handle.trim()}>
               <UserPlus size={16} />
-              加入观察室
+              加入复核室
             </Button>
           </form>
         </section>
@@ -448,7 +496,7 @@ export default function Watchroom({ actions }: { actions: Actions }) {
                   </Button>
                   <Button type="button" onClick={drop}>
                     <Trash2 size={16} />
-                    移出观察室
+                    移出复核室
                   </Button>
                 </div>
               </form>

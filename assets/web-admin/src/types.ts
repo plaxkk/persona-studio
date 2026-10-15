@@ -200,7 +200,6 @@ export type Page =
   | "history"
   | "benchmarks"
   | "accounts"
-  | "watchroom"
   | "algorithm"
   | "reports"
   | "settings";

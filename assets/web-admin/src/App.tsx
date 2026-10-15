@@ -9,7 +9,6 @@ import {
   ClipboardCheck,
   Telescope,
   ScanFace,
-  Eye,
   GitCommitHorizontal,
   LogOut,
   Menu,
@@ -44,7 +43,6 @@ import History from "./pages/History";
 import WeeklyReport from "./pages/WeeklyReport";
 import Benchmarks from "./pages/Benchmarks";
 import Accounts from "./pages/Accounts";
-import Watchroom from "./pages/Watchroom";
 import AlgorithmLog from "./pages/AlgorithmLog";
 import { BrowserConnection } from "./components/BrowserConnection";
 import SettingsPage from "./pages/SettingsPage";
@@ -56,7 +54,6 @@ const nav: { id: Page; label: string; icon: typeof House }[] = [
   { id: "history", label: "内容库", icon: Library },
   { id: "benchmarks", label: "对标账号", icon: Telescope },
   { id: "accounts", label: "账号观察", icon: ScanFace },
-  { id: "watchroom", label: "账号观察室", icon: Eye },
   { id: "algorithm", label: "算法更新", icon: GitCommitHorizontal },
   { id: "reports", label: "每周诊断", icon: ClipboardCheck },
   { id: "settings", label: "设置", icon: Settings },
@@ -473,8 +470,6 @@ export default function App() {
               <Benchmarks data={data} actions={actions} />
             ) : page === "accounts" ? (
               <Accounts data={data} actions={actions} />
-            ) : page === "watchroom" ? (
-              <Watchroom actions={actions} />
             ) : page === "algorithm" ? (
               <AlgorithmLog actions={actions} />
             ) : page === "reports" ? (
