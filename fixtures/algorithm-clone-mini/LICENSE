@@ -1,0 +1,7 @@
+这份目录里的代码结构和标识符抄自 xai-org/x-algorithm（Apache License 2.0）。
+
+上游仓库：https://github.com/xai-org/x-algorithm
+许可全文见上游仓库根目录的 LICENSE 文件（Apache License, Version 2.0）。
+
+本目录是**测试夹具**：结构照抄上游，数值被改过，不要把它当成上游的事实来源
+（详见同目录 README.md）。

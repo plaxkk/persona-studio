@@ -1,0 +1,2225 @@
+{
+  "conflicts": [
+    {
+      "sources": [
+        {
+          "file": "home-mixer/params/param.rs",
+          "line": 401,
+          "value": 0.006
+        },
+        {
+          "file": "vm-ranker/params.rs",
+          "line": 54,
+          "value": 0.004
+        }
+      ],
+      "symbol": "ContDwellTimeWeight"
+    },
+    {
+      "sources": [
+        {
+          "file": "home-mixer/params/param.rs",
+          "line": 320,
+          "value": 0.66
+        },
+        {
+          "file": "vm-ranker/params.rs",
+          "line": 3,
+          "value": 0.5
+        }
+      ],
+      "symbol": "FavoriteWeight"
+    },
+    {
+      "sources": [
+        {
+          "file": "home-mixer/params/param.rs",
+          "line": 414,
+          "value": -52.272
+        },
+        {
+          "file": "vm-ranker/params.rs",
+          "line": 108,
+          "value": -47.52
+        }
+      ],
+      "symbol": "NotInterestedWeight"
+    },
+    {
+      "sources": [
+        {
+          "file": "home-mixer/params/param.rs",
+          "line": 389,
+          "value": 0.015
+        },
+        {
+          "file": "vm-ranker/params.rs",
+          "line": 90,
+          "value": 0.02
+        }
+      ],
+      "symbol": "PostUnexploredWeight"
+    },
+    {
+      "sources": [
+        {
+          "file": "home-mixer/params/param.rs",
+          "line": 341,
+          "value": 0.02
+        },
+        {
+          "file": "vm-ranker/params.rs",
+          "line": 12,
+          "value": 0.07
+        }
+      ],
+      "symbol": "VideoOpenWeight"
+    }
+  ],
+  "entries": [
+    {
+      "condition": "帖是原创；作者和你互相关注；并且这次服务发生在 For You 流里",
+      "direction": "positive",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::BidirectionalFollowReplyWeightBoost",
+      "name": "互关作者的原创帖：回复权重加成",
+      "note": "官方文档 `docs/BIDIRECTIONAL_BOOST_CHANGE.md` 记了它的来历：2026-07-10 起 A/B 测 5/10/15/20，07-13 全量上 20，07-24 降到 15（理由是「人们看不到足够多来自未关注账号的讨论」）。它抬的不是回复**次数**，是「预测你会回复」这个概率上乘的那个权重。对人话就是：你发原创帖，跟你互关的人更容易在推荐流里看到它。",
+      "official": "rust_home_mixer_bidirectional_follow_reply_weight_boost",
+      "order": 1,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 322,
+        "span": "param!( BidirectionalFollowReplyWeightBoost, f64, \"rust_home_mixer_bidirectional_follow_reply_weight_boost\", 15.0 );",
+        "value_line": 326
+      },
+      "symbol": "BidirectionalFollowReplyWeightBoost",
+      "target": [
+        "follower",
+        "flow"
+      ],
+      "unit": "boost",
+      "value": 15.0,
+      "value_raw": "15.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "同上一行的条件",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::BidirectionalFollowDwellWeightBoost",
+      "name": "互关作者的原创帖：停留权重加成",
+      "note": "同一份官方文档说这个「停留加成」试过但**没铺开**，所以当前是 0.0。0 不代表没设计过，代表当前版本没启用——这正是本页要区分的东西。",
+      "official": "rust_home_mixer_bidirectional_follow_dwell_weight_boost",
+      "order": 2,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 328,
+        "span": "param!( BidirectionalFollowDwellWeightBoost, f64, \"rust_home_mixer_bidirectional_follow_dwell_weight_boost\", 0.0 );",
+        "value_line": 332
+      },
+      "symbol": "BidirectionalFollowDwellWeightBoost",
+      "target": [
+        "flow"
+      ],
+      "unit": "boost",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::EnableBidirectionalFollowHydration",
+      "name": "加载「谁跟你互关」这份数据",
+      "note": "上面那两条加成得先知道谁跟你互关才算得出来。这个开关是那份数据的来源，关掉它加成就是死的。当前是开的。",
+      "official": "rust_home_mixer_enable_bidirectional_follow_hydration",
+      "order": 3,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 713,
+        "span": "param!( EnableBidirectionalFollowHydration, bool, \"rust_home_mixer_enable_bidirectional_follow_hydration\", true );",
+        "value_line": 717
+      },
+      "symbol": "EnableBidirectionalFollowHydration",
+      "target": [
+        "follower"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::FollowAuthorWeight",
+      "name": "关注作者（在 For You 流里点关注）",
+      "note": "管的是「从推荐流里关注了这个人」这个动作。它和回复 / 引用 / 私信分享（都是 5.0）同档，是「涨粉」在排序里唯一的直接正向项。",
+      "official": "rust_home_mixer_follow_author_weight",
+      "order": 4,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 383,
+        "span": "param!( FollowAuthorWeight, f64, \"rust_home_mixer_follow_author_weight\", 4.0 );",
+        "value_line": 387
+      },
+      "symbol": "FollowAuthorWeight",
+      "target": [
+        "follower"
+      ],
+      "unit": "weight",
+      "value": 4.0,
+      "value_raw": "4.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::EnableWhoToFollowModule",
+      "name": "「关注谁」模块",
+      "note": "信息流里那个推荐关注对象的模块。开着才有这个曝光位。",
+      "official": "rust_home_mixer_enable_who_to_follow_module",
+      "order": 5,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 975,
+        "span": "param!( EnableWhoToFollowModule, bool, \"rust_home_mixer_enable_who_to_follow_module\", true );",
+        "value_line": 979
+      },
+      "symbol": "EnableWhoToFollowModule",
+      "target": [
+        "follower"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::WhoToFollowFatigueHours",
+      "name": "「关注谁」的疲劳期",
+      "note": "同一个「关注谁」推荐对同一个人 30 小时内不重复出现。",
+      "official": "rust_home_mixer_who_to_follow_fatigue_hours",
+      "order": 6,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 981,
+        "span": "param!( WhoToFollowFatigueHours, u32, \"rust_home_mixer_who_to_follow_fatigue_hours\", 30 );",
+        "value_line": 985
+      },
+      "symbol": "WhoToFollowFatigueHours",
+      "target": [
+        "follower"
+      ],
+      "unit": "hours",
+      "value": 30,
+      "value_raw": "30",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "user-cred-v2/UserCredV2Config.scala::EngagementWindowDays",
+      "name": "账号信用只回看 7 天互动",
+      "note": "UserCredV2（账号信用）算互动时只看最近 7 天。也就是说历史互动**不是永久资产**，7 天前的表现在这里基本不再计入。",
+      "official": "EngagementWindowDays",
+      "order": 7,
+      "source": {
+        "file": "user-cred-v2/UserCredV2Config.scala",
+        "kind": "scala_val",
+        "line": 25,
+        "span": "val EngagementWindowDays: Int = 7",
+        "value_line": 25
+      },
+      "symbol": "EngagementWindowDays",
+      "target": [
+        "follower"
+      ],
+      "unit": "days",
+      "value": 7,
+      "value_raw": "val EngagementWindowDays: Int = 7",
+      "value_type": "Int"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::EnableNewUserMinEngagementFilter",
+      "name": "新账号最低互动门槛（当前关）",
+      "note": "「新帖得有人互动才继续推」的那类机制。当前是 **false**——关着。读到它的时候要连着下一行的阈值一起读。",
+      "official": "rust_home_mixer_enable_new_user_min_engagement_filter",
+      "order": 8,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 725,
+        "span": "param!( EnableNewUserMinEngagementFilter, bool, \"rust_home_mixer_enable_new_user_min_engagement_filter\", false );",
+        "value_line": 729
+      },
+      "symbol": "EnableNewUserMinEngagementFilter",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::NewUserMinEngagementThreshold",
+      "name": "上面那个门槛的阈值",
+      "note": "0.0。配合「开关是 false」一起读：现在等于没有这道门槛。",
+      "official": "rust_home_mixer_new_user_min_engagement_threshold",
+      "order": 9,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 743,
+        "span": "param!( NewUserMinEngagementThreshold, f64, \"rust_home_mixer_new_user_min_engagement_threshold\", 0.0 );",
+        "value_line": 747
+      },
+      "symbol": "NewUserMinEngagementThreshold",
+      "target": [
+        "flow"
+      ],
+      "unit": "threshold",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::NewUserMinEngagementFilterMaxAccountAgeSecs",
+      "name": "「新账号」的年龄定义",
+      "note": "注册 1800 秒（30 分钟）以内才算新账号，超出这个年纪就不再吃上面那条门槛。",
+      "official": "rust_home_mixer_new_user_min_engagement_filter_max_account_age_secs",
+      "order": 10,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 749,
+        "span": "param!( NewUserMinEngagementFilterMaxAccountAgeSecs, u64, \"rust_home_mixer_new_user_min_engagement_filter_max_account_age_secs\", 1800 );",
+        "value_line": 753
+      },
+      "symbol": "NewUserMinEngagementFilterMaxAccountAgeSecs",
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds",
+      "value": 1800,
+      "value_raw": "1800",
+      "value_type": "u64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "id": "home-mixer/params/param.rs::EnableMutualFollowJaccardHydration",
+      "name": "互关相似度特征（当前关）",
+      "note": "另一套「共同关注」的相似度特征，用来估你和作者的关系强度。当前 **false**。",
+      "official": "rust_home_mixer_enable_mutual_follow_jaccard_hydration",
+      "order": 11,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 706,
+        "span": "param!( EnableMutualFollowJaccardHydration, bool, \"rust_home_mixer_enable_mutual_follow_jaccard_hydration\", false );",
+        "value_line": 710
+      },
+      "symbol": "EnableMutualFollowJaccardHydration",
+      "target": [
+        "follower"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ShareViaCopyLinkWeight",
+      "name": "复制链接分享",
+      "note": "当前版本里单条最高的正向权重。上游那条警告在这里最要紧：20 是乘在「预测你会复制链接」的概率上，不是「一次复制链接抵 30 个赞」。",
+      "official": "rust_home_mixer_share_via_copy_link_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 363,
+        "span": "param!( ShareViaCopyLinkWeight, f64, \"rust_home_mixer_share_via_copy_link_weight\", 20.0 );",
+        "value_line": 367
+      },
+      "symbol": "ShareViaCopyLinkWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 20.0,
+      "value_raw": "20.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::QuoteWeight",
+      "name": "引用",
+      "note": "引用一条帖并加上自己的话。量级和回复、私信分享齐平（5.0），是转推（1.0）的五倍。",
+      "official": "rust_home_mixer_quote_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 370,
+        "span": "param!(QuoteWeight, f64, \"rust_home_mixer_quote_weight\", 5.0);",
+        "value_line": 370
+      },
+      "symbol": "QuoteWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 5.0,
+      "value_raw": "5.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ReplyWeight",
+      "name": "回复",
+      "note": "回复是「对话」信号。注意它会被互关加成抬：在互关作者的原创帖上，这一项的权重实际是 5.0 + 15.0。",
+      "official": "rust_home_mixer_reply_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 321,
+        "span": "param!(ReplyWeight, f64, \"rust_home_mixer_reply_weight\", 5.0);",
+        "value_line": 321
+      },
+      "symbol": "ReplyWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 5.0,
+      "value_raw": "5.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ShareViaDmWeight",
+      "name": "私信分享",
+      "note": "把帖发给某一个具体的人，比公开转发的意愿更强，所以是 5.0 而不是 2.0。",
+      "official": "rust_home_mixer_share_via_dm_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 357,
+        "span": "param!( ShareViaDmWeight, f64, \"rust_home_mixer_share_via_dm_weight\", 5.0 );",
+        "value_line": 361
+      },
+      "symbol": "ShareViaDmWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 5.0,
+      "value_raw": "5.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ShareWeight",
+      "name": "分享（泛指）",
+      "note": "不指定分享到哪里的那一种分享，2.0——正好是转推的两倍。",
+      "official": "rust_home_mixer_share_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 356,
+        "span": "param!(ShareWeight, f64, \"rust_home_mixer_share_weight\", 2.0);",
+        "value_line": 356
+      },
+      "symbol": "ShareWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 2.0,
+      "value_raw": "2.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::RetweetWeight",
+      "name": "转推",
+      "note": "1.0。其他数看起来都是相对它而言，但按上游那条警告，这个「相对」是在**概率空间**里的相对，不是次数上的相对。",
+      "official": "rust_home_mixer_retweet_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 334,
+        "span": "param!(RetweetWeight, f64, \"rust_home_mixer_retweet_weight\", 1.0);",
+        "value_line": 334
+      },
+      "symbol": "RetweetWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 1.0,
+      "value_raw": "1.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::FavoriteWeight",
+      "name": "点赞",
+      "note": "点赞是 0.66，**比转推（1.0）还低**。因为「预测你会点赞」的基线概率高——大家本来就常点赞，概率高，权重不用大就能影响结果。**这不代表点赞没用**，只代表它不该和转推比大小。",
+      "official": "rust_home_mixer_favorite_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 320,
+        "span": "param!(FavoriteWeight, f64, \"rust_home_mixer_favorite_weight\", 0.66);",
+        "value_line": 320
+      },
+      "symbol": "FavoriteWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.66,
+      "value_raw": "0.66",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ContClickDwellTimeWeight",
+      "name": "点进去之后的停留时长",
+      "note": "这一项乘的是连续的**秒数**，不是概率——所以它是本区里唯一不能按「概率权重」读的一条。",
+      "official": "rust_home_mixer_cont_click_dwell_time_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 407,
+        "span": "param!( ContClickDwellTimeWeight, f64, \"rust_home_mixer_cont_click_dwell_time_weight\", 0.4 );",
+        "value_line": 411
+      },
+      "symbol": "ContClickDwellTimeWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.4,
+      "value_raw": "0.4",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ClickWeight",
+      "name": "点进这条帖",
+      "note": "0.3——点开看详情这个动作。",
+      "official": "rust_home_mixer_click_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 347,
+        "span": "param!(ClickWeight, f64, \"rust_home_mixer_click_weight\", 0.3);",
+        "value_line": 347
+      },
+      "symbol": "ClickWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.3,
+      "value_raw": "0.3",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::OpenLinkWeight",
+      "name": "打开外链",
+      "note": "0.2——帖子里挂了外链并且真的点开了。",
+      "official": "rust_home_mixer_open_link_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 348,
+        "span": "param!(OpenLinkWeight, f64, \"rust_home_mixer_open_link_weight\", 0.2);",
+        "value_line": 348
+      },
+      "symbol": "OpenLinkWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.2,
+      "value_raw": "0.2",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::DwellWeight",
+      "name": "停留（有 / 无）",
+      "note": "二值的「停留了」信号，和上面按秒算的那条不是一回事。",
+      "official": "rust_home_mixer_dwell_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 369,
+        "span": "param!(DwellWeight, f64, \"rust_home_mixer_dwell_weight\", 0.05);",
+        "value_line": 369
+      },
+      "symbol": "DwellWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.05,
+      "value_raw": "0.05",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::PhotoExpandWeight",
+      "name": "展开图片",
+      "note": "0.05——多图帖里点开看图。",
+      "official": "rust_home_mixer_photo_expand_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 335,
+        "span": "param!( PhotoExpandWeight, f64, \"rust_home_mixer_photo_expand_weight\", 0.05 );",
+        "value_line": 339
+      },
+      "symbol": "PhotoExpandWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.05,
+      "value_raw": "0.05",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::QuotedClickWeight",
+      "name": "点击被引用的那条帖",
+      "note": "0.05——从引用帖跳到原帖去看。",
+      "official": "rust_home_mixer_quoted_click_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 371,
+        "span": "param!( QuotedClickWeight, f64, \"rust_home_mixer_quoted_click_weight\", 0.05 );",
+        "value_line": 375
+      },
+      "symbol": "QuotedClickWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.05,
+      "value_raw": "0.05",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::VideoOpenWeight",
+      "name": "打开视频",
+      "note": "两份 param 文件给的值不一样（`vm-ranker/params.rs` 是 0.07），见页尾「两份源码给的数不一样」。",
+      "official": "rust_home_mixer_video_open_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 341,
+        "span": "param!( VideoOpenWeight, f64, \"rust_home_mixer_video_open_weight\", 0.02 );",
+        "value_line": 345
+      },
+      "symbol": "VideoOpenWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.02,
+      "value_raw": "0.02",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::PostUnexploredWeight",
+      "name": "「没探索过的内容」",
+      "note": "给没见过的话题一点曝光。当前只作用于站内内容，见门槛区的 `PostUnexploredIncludeOutOfNetwork = false`。",
+      "official": "rust_home_mixer_post_unexplored_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 389,
+        "span": "param!( PostUnexploredWeight, f64, \"rust_home_mixer_post_unexplored_weight\", 0.015 );",
+        "value_line": 393
+      },
+      "symbol": "PostUnexploredWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.015,
+      "value_raw": "0.015",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ContDwellTimeWeight",
+      "name": "连续停留的秒数",
+      "note": "**两份源码给的数不一样**：这里是 0.006，`vm-ranker/params.rs` 给的是 0.004。清单引 home-mixer 这一份，差在哪在页尾照实列出。",
+      "official": "rust_home_mixer_cont_dwell_time_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 401,
+        "span": "param!( ContDwellTimeWeight, f64, \"rust_home_mixer_cont_dwell_time_weight\", 0.006 );",
+        "value_line": 405
+      },
+      "symbol": "ContDwellTimeWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.006,
+      "value_raw": "0.006",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ProfileClickWeight",
+      "name": "点作者头像",
+      "note": "当前是 0.0——这一项现在不往总分里加东西。",
+      "official": "rust_home_mixer_profile_click_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 349,
+        "span": "param!( ProfileClickWeight, f64, \"rust_home_mixer_profile_click_weight\", 0.0 );",
+        "value_line": 353
+      },
+      "symbol": "ProfileClickWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::QuotedVqvWeight",
+      "name": "被引用的视频完播",
+      "note": "当前是 0.0。",
+      "official": "rust_home_mixer_quoted_vqv_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 377,
+        "span": "param!( QuotedVqvWeight, f64, \"rust_home_mixer_quoted_vqv_weight\", 0.0 );",
+        "value_line": 381
+      },
+      "symbol": "QuotedVqvWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::ReactWithVideoWeight",
+      "name": "用视频回应",
+      "note": "当前是 0.0。",
+      "official": "rust_home_mixer_react_with_video_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 395,
+        "span": "param!( ReactWithVideoWeight, f64, \"rust_home_mixer_react_with_video_weight\", 0.0 );",
+        "value_line": 399
+      },
+      "symbol": "ReactWithVideoWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "id": "home-mixer/params/param.rs::VqvWeight",
+      "name": "视频完播",
+      "note": "当前是 0.0。上游代码里它是「合格才计」的一项（`vqv_eligible`），但权重本身就是 0。",
+      "official": "rust_home_mixer_vqv_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 355,
+        "span": "param!(VqvWeight, f64, \"rust_home_mixer_vqv_weight\", 0.0);",
+        "value_line": 355
+      },
+      "symbol": "VqvWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "id": "home-mixer/params/param.rs::ReportWeight",
+      "name": "举报这条帖",
+      "note": "绝对值最大的一条负向。上游专门写了一段解释它为什么这么大：举报的基线概率比点赞低一千倍以上，不放大就根本影响不了排序。**不能读成「一个举报抵几百个赞」。**还有一条更要紧：只有在你自己的首页时间线里**真实看到这条帖之后**做出的举报才算数——直接点进某条帖的链接（比如群里发的）对排序没有影响。",
+      "official": "rust_home_mixer_report_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 432,
+        "span": "param!(ReportWeight, f64, \"rust_home_mixer_report_weight\", -234.0);",
+        "value_line": 432
+      },
+      "symbol": "ReportWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": -234.0,
+      "value_raw": "-234.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "id": "home-mixer/params/param.rs::MuteAuthorWeight",
+      "name": "屏蔽该作者",
+      "note": "绝对值 58.8，比「不感兴趣」（52.272）还高一点：屏蔽是更强的表态。它绝对值大同样是因为这个动作稀有，不是因为「一个屏蔽抵多少个赞」。",
+      "official": "rust_home_mixer_mute_author_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 426,
+        "span": "param!( MuteAuthorWeight, f64, \"rust_home_mixer_mute_author_weight\", -58.8 );",
+        "value_line": 430
+      },
+      "symbol": "MuteAuthorWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": -58.8,
+      "value_raw": "-58.8",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "id": "home-mixer/params/param.rs::NotInterestedWeight",
+      "name": "点了「不感兴趣」",
+      "note": "**两份源码给的数不一样**：这里是 -52.272，`vm-ranker/params.rs` 给的是 -47.52。",
+      "official": "rust_home_mixer_not_interested_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 414,
+        "span": "param!( NotInterestedWeight, f64, \"rust_home_mixer_not_interested_weight\", -52.272 );",
+        "value_line": 418
+      },
+      "symbol": "NotInterestedWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": -52.272,
+      "value_raw": "-52.272",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "id": "home-mixer/params/param.rs::BlockAuthorWeight",
+      "name": "拉黑该作者",
+      "note": "31.2。值得注意的是它**比屏蔽还低**——拉黑是一次性的关系切断，之后这个人就不再进入你的候选池，所以不需要靠一个更大的负权重来压。",
+      "official": "rust_home_mixer_block_author_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 420,
+        "span": "param!( BlockAuthorWeight, f64, \"rust_home_mixer_block_author_weight\", -31.2 );",
+        "value_line": 424
+      },
+      "symbol": "BlockAuthorWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": -31.2,
+      "value_raw": "-31.2",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "id": "home-mixer/params/param.rs::NotDwelledWeight",
+      "name": "划过去没停留",
+      "note": "绝对值很小（0.02），但它是「沉默的负反馈」——一次不值钱，量大就值钱。",
+      "official": "rust_home_mixer_not_dwelled_weight",
+      "order": 0,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 433,
+        "span": "param!( NotDwelledWeight, f64, \"rust_home_mixer_not_dwelled_weight\", -0.02 );",
+        "value_line": 437
+      },
+      "symbol": "NotDwelledWeight",
+      "target": [
+        "flow"
+      ],
+      "unit": "weight",
+      "value": -0.02,
+      "value_raw": "-0.02",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::OonWeightFactor",
+      "name": "站外内容折扣",
+      "note": "你没关注的人发的内容，整体乘 0.75。「站外 / 站内」（out-of-network / in-network）指的就是你和作者之间有没有关注关系。",
+      "official": "rust_home_mixer_oon_weight_factor",
+      "order": 1,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 211,
+        "span": "param!( OonWeightFactor, f64, \"rust_home_mixer_oon_weight_factor\", 0.75 );",
+        "value_line": 215
+      },
+      "symbol": "OonWeightFactor",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.75,
+      "value_raw": "0.75",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::TopicOonWeightFactor",
+      "name": "话题维度的站外折扣",
+      "note": "0.5，比整体的 0.75 更狠。",
+      "official": "rust_home_mixer_topic_oon_weight_factor",
+      "order": 2,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 205,
+        "span": "param!( TopicOonWeightFactor, f64, \"rust_home_mixer_topic_oon_weight_factor\", 0.5 );",
+        "value_line": 209
+      },
+      "symbol": "TopicOonWeightFactor",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.5,
+      "value_raw": "0.5",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::NewUserOonWeightFactor",
+      "name": "新账号看站外内容",
+      "note": "0.00001——新账号的首页几乎只推已经关注的内容。",
+      "official": "rust_home_mixer_new_user_oon_weight_factor",
+      "order": 3,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 223,
+        "span": "param!( NewUserOonWeightFactor, f64, \"rust_home_mixer_new_user_oon_weight_factor\", 0.00001 );",
+        "value_line": 227
+      },
+      "symbol": "NewUserOonWeightFactor",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 1e-05,
+      "value_raw": "0.00001",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::EnableOonRescoreForInNetworkRepliesRetweets",
+      "name": "站内的回复/转推也按站外再算一遍",
+      "note": "开着（true）。所以「已经关注了」不等于豁免折扣——站内的回复和转推要再挨一次。",
+      "official": "rust_home_mixer_enable_oon_rescore_for_in_network_replies_retweets",
+      "order": 4,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 187,
+        "span": "param!( EnableOonRescoreForInNetworkRepliesRetweets, bool, \"rust_home_mixer_enable_oon_rescore_for_in_network_replies_retweets\", true );",
+        "value_line": 191
+      },
+      "symbol": "EnableOonRescoreForInNetworkRepliesRetweets",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::EnableAuthorDiversity",
+      "name": "作者多样性",
+      "note": "同一个人连着出现会被打折，防止一个人的内容铺满整个首页。",
+      "official": "rust_home_mixer_enable_author_diversity",
+      "order": 5,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 169,
+        "span": "param!( EnableAuthorDiversity, bool, \"rust_home_mixer_enable_author_diversity\", true );",
+        "value_line": 173
+      },
+      "symbol": "EnableAuthorDiversity",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::AuthorDiversityDecay",
+      "name": "作者多样性衰减系数",
+      "note": "公式是 `(1 - floor) × decay^k + floor`，k 是同一位作者在这一屏里出现的第几条。",
+      "official": "rust_home_mixer_author_diversity_decay",
+      "order": 6,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 175,
+        "span": "param!( AuthorDiversityDecay, f64, \"rust_home_mixer_author_diversity_decay\", 0.5 );",
+        "value_line": 179
+      },
+      "symbol": "AuthorDiversityDecay",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.5,
+      "value_raw": "0.5",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::AuthorDiversityFloor",
+      "name": "作者多样性折扣下限",
+      "note": "floor = 0.25 表示打折有下限：同作者第 1 条是 0.75×，第 2 条 0.625×，一路逼近但不会低于 0.25×。",
+      "official": "rust_home_mixer_author_diversity_floor",
+      "order": 7,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 181,
+        "span": "param!( AuthorDiversityFloor, f64, \"rust_home_mixer_author_diversity_floor\", 0.25 );",
+        "value_line": 185
+      },
+      "symbol": "AuthorDiversityFloor",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.25,
+      "value_raw": "0.25",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::MultiplierPreOffset",
+      "name": "乘子与负分压缩的次序",
+      "note": "控制「先压缩负分再加乘子」还是反过来。当前 false。",
+      "official": "rust_home_mixer_multiplier_pre_offset",
+      "order": 8,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 193,
+        "span": "param!( MultiplierPreOffset, bool, \"rust_home_mixer_multiplier_pre_offset\", false );",
+        "value_line": 197
+      },
+      "symbol": "MultiplierPreOffset",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::WeightPerturbationSigma",
+      "name": "权重扰动幅度",
+      "note": "官方会按用户给每个权重乘 `exp(±sigma)`（防过拟合）。当前 0.0 = **关着**。",
+      "official": "rust_home_mixer_weight_perturbation_sigma",
+      "order": 9,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 157,
+        "span": "param!( WeightPerturbationSigma, f64, \"rust_home_mixer_weight_perturbation_sigma\", 0.0 );",
+        "value_line": 161
+      },
+      "symbol": "WeightPerturbationSigma",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.0,
+      "value_raw": "0.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::WeightPerturbationSalt",
+      "name": "权重扰动的盐",
+      "note": "上面那个扰动的随机器种。空字符串，配合 0.0 一起读：扰动没启用。",
+      "official": "rust_home_mixer_weight_perturbation_salt",
+      "order": 10,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 163,
+        "span": "param!( WeightPerturbationSalt, String, \"rust_home_mixer_weight_perturbation_salt\", \"\" );",
+        "value_line": 167
+      },
+      "symbol": "WeightPerturbationSalt",
+      "target": [
+        "flow"
+      ],
+      "unit": "constant",
+      "value": "",
+      "value_raw": "\"\"",
+      "value_type": "String"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::DppEnabled",
+      "name": "多样性重排（DPP）",
+      "note": "开着（true）。它在排序之后再做一次「别都长一个样」的重排。",
+      "official": "rust_home_mixer_vm_ranker_dpp_enabled",
+      "order": 11,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 235,
+        "span": "param!( DppEnabled, bool, \"rust_home_mixer_vm_ranker_dpp_enabled\", true );",
+        "value_line": 239
+      },
+      "symbol": "DppEnabled",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::DppTheta",
+      "name": "DPP 的多样性强度",
+      "note": "0.65。越大越强制多样，越小越放任相似内容扎堆。",
+      "official": "rust_home_mixer_vm_ranker_dpp_theta",
+      "order": 12,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 247,
+        "span": "param!(DppTheta, f64, \"rust_home_mixer_vm_ranker_dpp_theta\", 0.65);",
+        "value_line": 247
+      },
+      "symbol": "DppTheta",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.65,
+      "value_raw": "0.65",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "vm-ranker/params.rs::DppMaxSelectedRank",
+      "name": "DPP 只作用于前多少名",
+      "note": "只在前 150 名里重排，再往后的位置不管。",
+      "official": "rust_home_mixer_vm_ranker_dpp_max_selected_rank",
+      "order": 13,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 248,
+        "span": "param!( DppMaxSelectedRank, u32, \"rust_home_mixer_vm_ranker_dpp_max_selected_rank\", 150 );",
+        "value_line": 252
+      },
+      "symbol": "DppMaxSelectedRank",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": 150,
+      "value_raw": "150",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "id": "xai-value-model/weights.rs::NEGATIVE_SCORES_OFFSET",
+      "name": "负分压缩常量",
+      "note": "**负分不是直接减。** 上游把所有负分压进 `0..0.001` 这一段（`(combined + negative_sum) / total_sum × 0.001`），正分则统一加 0.001。所以 `ReportWeight = -234` 不是「从总分里减 234」。",
+      "official": "NEGATIVE_SCORES_OFFSET",
+      "order": 14,
+      "source": {
+        "file": "xai-value-model/weights.rs",
+        "kind": "rust_const",
+        "line": 4,
+        "span": "pub const NEGATIVE_SCORES_OFFSET: f64 = 0.001;",
+        "value_line": 4
+      },
+      "symbol": "NEGATIVE_SCORES_OFFSET",
+      "target": [
+        "flow"
+      ],
+      "unit": "constant",
+      "value": 0.001,
+      "value_raw": "0.001",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnableServedFilterAllRequests",
+      "name": "推过的不再推",
+      "note": "所有请求都过滤掉已经推给过你的帖。",
+      "official": "rust_home_mixer_enable_served_filter_all_requests",
+      "order": 1,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 863,
+        "span": "param!( EnableServedFilterAllRequests, bool, \"rust_home_mixer_enable_served_filter_all_requests\", true );",
+        "value_line": 867
+      },
+      "symbol": "EnableServedFilterAllRequests",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::ExcludeServedTweetIdsDuration",
+      "name": "推过的帖多久内不再出现",
+      "note": "10 分钟。",
+      "official": "rust_home_mixer_exclude_served_tweet_ids_duration_minutes",
+      "order": 2,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 990,
+        "span": "param!( ExcludeServedTweetIdsDuration, u32, \"rust_home_mixer_exclude_served_tweet_ids_duration_minutes\", 10 );",
+        "value_line": 994
+      },
+      "symbol": "ExcludeServedTweetIdsDuration",
+      "target": [
+        "flow"
+      ],
+      "unit": "minutes",
+      "value": 10,
+      "value_raw": "10",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::ExcludeServedTweetIdsNumber",
+      "name": "记住最近多少条推过的帖",
+      "note": "100 条。",
+      "official": "rust_home_mixer_exclude_served_tweet_ids_number",
+      "order": 3,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 996,
+        "span": "param!( ExcludeServedTweetIdsNumber, usize, \"rust_home_mixer_exclude_served_tweet_ids_number\", 100 );",
+        "value_line": 1000
+      },
+      "symbol": "ExcludeServedTweetIdsNumber",
+      "target": [
+        "flow"
+      ],
+      "unit": "count",
+      "value": 100,
+      "value_raw": "100",
+      "value_type": "usize"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::MinVideoDurationMs",
+      "name": "视频计入门槛",
+      "note": "视频要够 10 秒才进入和视频有关的那些计算。",
+      "official": "rust_home_mixer_min_video_duration_ms",
+      "order": 4,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 588,
+        "span": "param!( MinVideoDurationMs, i32, \"rust_home_mixer_min_video_duration_ms\", 10_000 );",
+        "value_line": 592
+      },
+      "symbol": "MinVideoDurationMs",
+      "target": [
+        "flow"
+      ],
+      "unit": "milliseconds",
+      "value": 10000,
+      "value_raw": "10_000",
+      "value_type": "i32"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnableQuotedVqvDurationCheck",
+      "name": "被引用视频也查时长",
+      "note": "当前 false——被引用的视频不查这 10 秒。",
+      "official": "rust_home_mixer_enable_quoted_vqv_duration_check",
+      "order": 5,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 595,
+        "span": "param!( EnableQuotedVqvDurationCheck, bool, \"rust_home_mixer_enable_quoted_vqv_duration_check\", false );",
+        "value_line": 599
+      },
+      "symbol": "EnableQuotedVqvDurationCheck",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "vm-ranker/params.rs::PostUnexploredIncludeOutOfNetwork",
+      "name": "「没探索过的内容」是否含站外",
+      "note": "false = 只作用于站内。这就是正向区里 `PostUnexploredWeight` 生效范围的上限。",
+      "official": "rust_home_mixer_post_unexplored_include_out_of_network",
+      "order": 6,
+      "source": {
+        "file": "vm-ranker/params.rs",
+        "kind": "param_macro",
+        "line": 96,
+        "span": "param!( PostUnexploredIncludeOutOfNetwork, bool, \"rust_home_mixer_post_unexplored_include_out_of_network\", false );",
+        "value_line": 100
+      },
+      "symbol": "PostUnexploredIncludeOutOfNetwork",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnableExplicitEngagementSignals",
+      "name": "显式互动信号",
+      "note": "把你明确做过的互动（点赞、回复……）当特征用。",
+      "official": "rust_home_mixer_enable_explicit_engagement_signals",
+      "order": 7,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 616,
+        "span": "param!( EnableExplicitEngagementSignals, bool, \"rust_home_mixer_enable_explicit_engagement_signals\", true );",
+        "value_line": 620
+      },
+      "symbol": "EnableExplicitEngagementSignals",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnableImplicitEngagementSignals",
+      "name": "隐式互动信号",
+      "note": "把停留、划过这类没有明说动作的信号也当特征用。",
+      "official": "rust_home_mixer_enable_implicit_engagement_signals",
+      "order": 8,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 622,
+        "span": "param!( EnableImplicitEngagementSignals, bool, \"rust_home_mixer_enable_implicit_engagement_signals\", true );",
+        "value_line": 626
+      },
+      "symbol": "EnableImplicitEngagementSignals",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EngagementSignalsMaxPerType",
+      "name": "每类互动信号最多取几条",
+      "note": "15 条。「看得越多越懂你」这件事有个 15 条的封顶。",
+      "official": "rust_home_mixer_engagement_signals_max_per_type",
+      "order": 9,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 628,
+        "span": "param!( EngagementSignalsMaxPerType, usize, \"rust_home_mixer_engagement_signals_max_per_type\", 15 );",
+        "value_line": 632
+      },
+      "symbol": "EngagementSignalsMaxPerType",
+      "target": [
+        "flow"
+      ],
+      "unit": "count",
+      "value": 15,
+      "value_raw": "15",
+      "value_type": "usize"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnableIpFeature",
+      "name": "使用 IP 特征",
+      "note": "开着。这是按地区做合规限制（比如某些国家屏蔽某类内容）的输入之一。",
+      "official": "rust_home_mixer_enable_geo_features",
+      "order": 10,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 609,
+        "span": "param!( EnableIpFeature, bool, \"rust_home_mixer_enable_geo_features\", true );",
+        "value_line": 613
+      },
+      "symbol": "EnableIpFeature",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnableFollowingRepliedUsersFacepile",
+      "name": "「你关注的人也回复了」提示",
+      "note": "当前 **false**——这个提示位没开。",
+      "official": "rust_home_mixer_enable_following_replied_users_facepile",
+      "order": 11,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 440,
+        "span": "param!( EnableFollowingRepliedUsersFacepile, bool, \"rust_home_mixer_enable_following_replied_users_facepile\", false );",
+        "value_line": 444
+      },
+      "symbol": "EnableFollowingRepliedUsersFacepile",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::PhoenixRetrievalExcludeSeenPosts",
+      "name": "召回阶段排除看过的帖",
+      "note": "false——召回阶段不排除，靠上面的 served filter 在最后一步兜。",
+      "official": "rust_home_mixer_phoenix_retrieval_exclude_seen_posts",
+      "order": 12,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 256,
+        "span": "param!( PhoenixRetrievalExcludeSeenPosts, bool, \"rust_home_mixer_phoenix_retrieval_exclude_seen_posts\", false );",
+        "value_line": 260
+      },
+      "symbol": "PhoenixRetrievalExcludeSeenPosts",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::EnablePhoenixRetrievalFallback",
+      "name": "召回兜底路径",
+      "note": "当前 false。",
+      "official": "rust_home_mixer_phoenix_retrieval_enable_fallback",
+      "order": 13,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 249,
+        "span": "param!( EnablePhoenixRetrievalFallback, bool, \"rust_home_mixer_phoenix_retrieval_enable_fallback\", false );",
+        "value_line": 253
+      },
+      "symbol": "EnablePhoenixRetrievalFallback",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": false,
+      "value_raw": "false",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::PhoenixRankerNewUserHistoryThreshold",
+      "name": "新账号的排序历史门槛",
+      "note": "0 秒——等于没有门槛，新账号也走正常排序模型。",
+      "official": "rust_home_mixer_phoenix_ranker_new_user_history_threshold",
+      "order": 14,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 269,
+        "span": "param!( PhoenixRankerNewUserHistoryThreshold, u64, \"rust_home_mixer_phoenix_ranker_new_user_history_threshold\", 0 );",
+        "value_line": 273
+      },
+      "symbol": "PhoenixRankerNewUserHistoryThreshold",
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds",
+      "value": 0,
+      "value_raw": "0",
+      "value_type": "u64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "id": "home-mixer/params/param.rs::PhoenixRetrievalNewUserHistoryThreshold",
+      "name": "新账号的召回历史门槛",
+      "note": "0 秒，同上。",
+      "official": "rust_home_mixer_phoenix_retrieval_new_user_history_threshold",
+      "order": 15,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 237,
+        "span": "param!( PhoenixRetrievalNewUserHistoryThreshold, u64, \"rust_home_mixer_phoenix_retrieval_new_user_history_threshold\", 0 );",
+        "value_line": 241
+      },
+      "symbol": "PhoenixRetrievalNewUserHistoryThreshold",
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds",
+      "value": 0,
+      "value_raw": "0",
+      "value_type": "u64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::EnableViewerColdStart",
+      "name": "对着「某作者你很少见」做冷启动",
+      "note": "开着。你对某个作者的曝光数低于阈值时，会把 ta 的内容抬一把。",
+      "official": "rust_home_mixer_enable_viewer_cold_start_boost",
+      "order": 1,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 527,
+        "span": "param!( EnableViewerColdStart, bool, \"rust_home_mixer_enable_viewer_cold_start_boost\", true );",
+        "value_line": 531
+      },
+      "symbol": "EnableViewerColdStart",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartImpressionThreshold",
+      "name": "曝光多少以下算「冷」",
+      "note": "**200**——而且算的是**在你首页的曝光数**（代码里是 `view_count_on_home`），不是全站曝光。也就是说这是一个针对「你」的阈值，同一条帖对不同的人算不算冷启动可以不一样。",
+      "official": "rust_home_mixer_cold_start_impression_threshold",
+      "order": 2,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 489,
+        "span": "param!( ColdStartImpressionThreshold, u32, \"rust_home_mixer_cold_start_impression_threshold\", 200 );",
+        "value_line": 493
+      },
+      "symbol": "ColdStartImpressionThreshold",
+      "target": [
+        "flow"
+      ],
+      "unit": "count",
+      "value": 200,
+      "value_raw": "200",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartFollowerCap",
+      "name": "作者粉丝数上限",
+      "note": "作者粉丝数 ≤ 50000 才够格。粉丝多的作者不吃这个加成。",
+      "official": "rust_home_mixer_cold_start_follower_cap",
+      "order": 3,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 507,
+        "span": "param!( ColdStartFollowerCap, i64, \"rust_home_mixer_cold_start_follower_cap\", 50000 );",
+        "value_line": 511
+      },
+      "symbol": "ColdStartFollowerCap",
+      "target": [
+        "flow"
+      ],
+      "unit": "count",
+      "value": 50000,
+      "value_raw": "50000",
+      "value_type": "i64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartMaxPostAgeSecs",
+      "name": "帖子的新鲜度要求",
+      "note": "7200 秒 = 2 小时内发的帖才算。",
+      "official": "rust_home_mixer_cold_start_max_post_age_secs",
+      "order": 4,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 513,
+        "span": "param!( ColdStartMaxPostAgeSecs, u64, \"rust_home_mixer_cold_start_max_post_age_secs\", 7200 );",
+        "value_line": 517
+      },
+      "symbol": "ColdStartMaxPostAgeSecs",
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds",
+      "value": 7200,
+      "value_raw": "7200",
+      "value_type": "u64"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartSlotMin",
+      "name": "抬到的位置（下界）",
+      "note": "第 15 位。这一区抬的是**位置**不是分数：把你的分数顶到「第 15 名那条帖的分数」。",
+      "official": "rust_home_mixer_cold_start_slot_min",
+      "order": 5,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 495,
+        "span": "param!( ColdStartSlotMin, u32, \"rust_home_mixer_cold_start_slot_min\", 15 );",
+        "value_line": 499
+      },
+      "symbol": "ColdStartSlotMin",
+      "target": [
+        "flow"
+      ],
+      "unit": "position",
+      "value": 15,
+      "value_raw": "15",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartSlotMax",
+      "name": "抬到的位置（上界）",
+      "note": "第 16 位。所以这条加成保证的是「进前 15~16 位」，不是「排第一」。",
+      "official": "rust_home_mixer_cold_start_slot_max",
+      "order": 6,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 501,
+        "span": "param!( ColdStartSlotMax, u32, \"rust_home_mixer_cold_start_slot_max\", 16 );",
+        "value_line": 505
+      },
+      "symbol": "ColdStartSlotMax",
+      "target": [
+        "flow"
+      ],
+      "unit": "position",
+      "value": 16,
+      "value_raw": "16",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::EnableColdStartThompsonSampling",
+      "name": "用 Thompson 采样选该抬哪条",
+      "note": "开着。避免每次都抬同一类内容。",
+      "official": "rust_home_mixer_enable_cold_start_thompson_sampling",
+      "order": 7,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 533,
+        "span": "param!( EnableColdStartThompsonSampling, bool, \"rust_home_mixer_enable_cold_start_thompson_sampling\", true );",
+        "value_line": 537
+      },
+      "symbol": "EnableColdStartThompsonSampling",
+      "target": [
+        "flow"
+      ],
+      "unit": "gate",
+      "value": true,
+      "value_raw": "true",
+      "value_type": "bool"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartBetaAlpha0",
+      "name": "采样的 Beta 先验 α₀",
+      "note": "和下一行一起读。",
+      "official": "rust_home_mixer_cold_start_beta_alpha0",
+      "order": 8,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 539,
+        "span": "param!( ColdStartBetaAlpha0, f64, \"rust_home_mixer_cold_start_beta_alpha0\", 0.75 );",
+        "value_line": 543
+      },
+      "symbol": "ColdStartBetaAlpha0",
+      "target": [
+        "flow"
+      ],
+      "unit": "constant",
+      "value": 0.75,
+      "value_raw": "0.75",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartBetaBeta0",
+      "name": "采样的 Beta 先验 β₀",
+      "note": "0.75 / (0.75 + 49.25) ≈ 0.015——先验的期望很低，意思是「默认认为新东西不好，要有证据才抬」。",
+      "official": "rust_home_mixer_cold_start_beta_beta0",
+      "order": 9,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 545,
+        "span": "param!( ColdStartBetaBeta0, f64, \"rust_home_mixer_cold_start_beta_beta0\", 49.25 );",
+        "value_line": 549
+      },
+      "symbol": "ColdStartBetaBeta0",
+      "target": [
+        "flow"
+      ],
+      "unit": "constant",
+      "value": 49.25,
+      "value_raw": "49.25",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartTsTopK",
+      "name": "每轮最多从几个候选里选",
+      "note": "2 个。",
+      "official": "rust_home_mixer_cold_start_ts_top_k",
+      "order": 10,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 551,
+        "span": "param!( ColdStartTsTopK, u32, \"rust_home_mixer_cold_start_ts_top_k\", 2 );",
+        "value_line": 555
+      },
+      "symbol": "ColdStartTsTopK",
+      "target": [
+        "flow"
+      ],
+      "unit": "count",
+      "value": 2,
+      "value_raw": "2",
+      "value_type": "u32"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::ColdStartImpressionScale",
+      "name": "曝光数的缩放",
+      "note": "1.0，当前等于不缩放。",
+      "official": "rust_home_mixer_cold_start_impression_scale",
+      "order": 11,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 557,
+        "span": "param!( ColdStartImpressionScale, f64, \"rust_home_mixer_cold_start_impression_scale\", 1.0 );",
+        "value_line": 561
+      },
+      "symbol": "ColdStartImpressionScale",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 1.0,
+      "value_raw": "1.0",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "negative",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::LowImpressionsMaxPositionRatio",
+      "name": "低曝光帖的位置比例",
+      "note": "0.97——曝光少的帖按 0.97 的位置比例处理，等于差点被压到最末尾。",
+      "official": "rust_home_mixer_low_impressions_max_boost_position_ratio",
+      "order": 12,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 520,
+        "span": "param!( LowImpressionsMaxPositionRatio, f64, \"rust_home_mixer_low_impressions_max_boost_position_ratio\", 0.97 );",
+        "value_line": 524
+      },
+      "symbol": "LowImpressionsMaxPositionRatio",
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier",
+      "value": 0.97,
+      "value_raw": "0.97",
+      "value_type": "f64"
+    },
+    {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "id": "home-mixer/params/param.rs::PhoenixColdStartMaxResults",
+      "name": "冷启动召回的条数上限",
+      "note": "200 条。",
+      "official": "rust_home_mixer_phoenix_cold_start_max_results",
+      "order": 13,
+      "source": {
+        "file": "home-mixer/params/param.rs",
+        "kind": "param_macro",
+        "line": 16,
+        "span": "param!( PhoenixColdStartMaxResults, u32, \"rust_home_mixer_phoenix_cold_start_max_results\", 200 );",
+        "value_line": 20
+      },
+      "symbol": "PhoenixColdStartMaxResults",
+      "target": [
+        "flow"
+      ],
+      "unit": "count",
+      "value": 200,
+      "value_raw": "200",
+      "value_type": "u32"
+    }
+  ],
+  "groups": [
+    {
+      "id": "follow_graph",
+      "note": "这一区排在最前面，因为它是「涨粉」这条线上唯一有**官方文档**记着来龙去脉的一段。上游在 `docs/BIDIRECTIONAL_BOOST_CHANGE.md` 里写了互关回复加成怎么从 5/10/15/20 里选定、什么时候全量、又为什么从 20 改回 15。区内的次序是我们编的（这些数不同量纲：权重、开关、天数、秒数），**官方给的值照样摆在每一行里**。",
+      "title": "互相关注与涨粉"
+    },
+    {
+      "id": "engagement_positive",
+      "note": "区内**按官方数值降序**——等级就是上游给的那个数，不是我们算的综合分。读这张表之前先看清单顶部那条上游自己的警告：这些数乘的是**预测概率**，不是次数，所以跨动作比大小没有意义；一个数小不代表那个动作不重要，可能只是它的基线概率本来就高。「关注作者」（4.0）在上一区，因为它的目标是涨粉。",
+      "rank_by": "desc",
+      "ranked": true,
+      "title": "正向互动权重"
+    },
+    {
+      "id": "engagement_negative",
+      "note": "**按绝对值降序**，不是按数值降序——`-234` 混在降序表里会排到最后，看上去最不重要，而它恰恰是最强的一条。绝对值大同样**不**等于「一个举报抵几百个赞」，理由见清单顶部。",
+      "rank_by": "abs",
+      "title": "负向互动权重"
+    },
+    {
+      "id": "multipliers",
+      "note": "这一区不在上面那把尺子上（单位是系数、常数，不是权重），所以**不按大小排**，次序是我们按「影响面排序」编的。它们的作用方式是把别的分数**乘一下**，而不是自己加进去。",
+      "title": "乘子与折扣"
+    },
+    {
+      "id": "gates",
+      "note": "这一区决定**某些项算不算数**。不合格通常是**把那一项的权重归零**，不是扣分——所以「门槛」和「权重」是两种不同的东西，不能混在一起排大小。",
+      "title": "门槛与资格"
+    },
+    {
+      "id": "cold_start",
+      "note": "上游 README 里管这个叫 New-Author Boost。**它的实现是抬位置、不是加分**——`apply_cold_start_decisions` 里写的是 `effective[i] = max(effective[i], ranked[rank])`，也就是把分数顶到「第 15 名那条帖的分数」。所以它保证的是「进前 15~16 位」，不是「加 15 分」。这一条对刚起号的人最直接。",
+      "title": "新作者冷启动"
+    }
+  ],
+  "not_listed": [
+    {
+      "detail": "Grox 那几条流程的提示词在本版本里是**上游主动剔除**的，不是我们没找到。三个文件里写着同一句原话：「As stated in README for the open source repo, prompts are excluded to reduce gameability of the system.」所以这一条的性质和「我们没读」完全不同：它是上游明确说「不公开」。",
+      "evidence": [
+        "grox/flows/reply_spam/prompts.py:12 —— 上述原话",
+        "grox/flows/upa/prompts.py:12 —— 同上",
+        "grox/flows/ptos/prompts.py:12 —— 同上",
+        "全仓库 0 个 .j2 文件；grox/flows 下 0 个 templates/ 目录"
+      ],
+      "kind": "withheld",
+      "title": "Grox 的提示词（上游自己剔除了）"
+    },
+    {
+      "detail": "仓库里有**训练代码**和合成数据生成代码，能跑一次概念验证训练；但线上在用的那个训练产物不在仓库里。所以「模型学到的是什么」这件事我们只能看到它出哪些「头」（点赞、回复、停留……）以及这些头怎么被加权，看不到权重矩阵本身。",
+      "evidence": [
+        "全仓库 0 个 .pt / .safetensors / .ckpt / .onnx / .bin 模型文件",
+        "README:48 —— 用「训练所用的代码」替换了原先的 Phoenix 演示模型，并给了合成数据生成，好让人能跑一次概念验证训练"
+      ],
+      "kind": "not_public",
+      "title": "线上在跑的那个 Phoenix 模型本身"
+    },
+    {
+      "detail": "有些阈值既不在 `params/param.rs` 里、也不在配置里，而是直接写死在某个 scorer 或 filter 的代码里。这一类**能读到，但本次没有逐条读**——只有冷启动那一个 scorer 是逐行读过的（`home-mixer/scorers/author_cold_start.rs`）。写在这里免得读的人以为「清单里没有 = 上游没有」。",
+      "evidence": [
+        "本次逐行读过的只有 home-mixer/scorers/author_cold_start.rs",
+        "其余 scorer / filter 未逐条读；不属于本次范围"
+      ],
+      "kind": "unread",
+      "title": "散落在各 scorer / filter 里的硬编码字面量"
+    },
+    {
+      "detail": "按本次范围约定不列：召回与索引（SimClusters、SID、Popular Posts）、缓存与 TTL、Kafka 上报、集群与推理部署（cluster id、retry、shadow traffic）、广告注入、模型结构本身。这些确实影响系统，但不是「这条帖为什么被推给你」这一层的逻辑。",
+      "evidence": [
+        "本次范围：只列流量与涨粉相关；负向信号与可见性限制算在内"
+      ],
+      "kind": "out_of_scope",
+      "title": "和流量/涨粉无关的工程细节"
+    }
+  ],
+  "notes": {
+    "engagement": "同一条里的另一个要点：只有**出现在 Home Timeline 里的帖子**上发生的互动才算数。直接点进某条帖子的链接（比如在群里组织人去点）对排序没有影响。",
+    "weights": "上游在这段代码上面亲手写了警告：权重乘的是**预测概率**，不是次数。所以「一次举报抵 468 个赞」这种读法是错的——举报的基线概率比点赞低一千倍以上，正因为低才把权重给得这么大，好让这个预测还能影响最终排序。**跨动作比大小没有意义。**"
+  },
+  "unclassified": [],
+  "upstream": {
+    "branch": "main",
+    "dirty": false,
+    "license": "Apache-2.0",
+    "paths": [
+      "home-mixer/params/param.rs",
+      "user-cred-v2/UserCredV2Config.scala",
+      "vm-ranker/params.rs",
+      "xai-value-model/weights.rs"
+    ],
+    "read_at": "2026-10-15",
+    "repo": "xai-org/x-algorithm",
+    "sha": "92f0918f6cb52837cb53a8c790c68f906b2c0db1"
+  },
+  "visibility": {
+    "audience_enum": {
+      "file": "visibility-filtering/rules/rule_spec/rule.rs",
+      "line": 97,
+      "non_followers_condition_line": 109
+    },
+    "audiences": {
+      "Everyone": 40,
+      "NonAuthors": 82,
+      "NonFollowers": 4,
+      "OnlyAuthor": 1
+    },
+    "home_only": [],
+    "levels": [
+      {
+        "file": "visibility-filtering/rules/levels.rs",
+        "id": "FILTER_ALL",
+        "line": 5,
+        "rules": 1
+      },
+      {
+        "file": "visibility-filtering/rules/levels.rs",
+        "id": "TIMELINE_HOME",
+        "line": 7,
+        "rules": 39
+      },
+      {
+        "file": "visibility-filtering/rules/levels.rs",
+        "id": "TIMELINE_HOME_RECOMMENDATIONS",
+        "line": 49,
+        "rules": 65
+      },
+      {
+        "file": "visibility-filtering/rules/levels.rs",
+        "id": "TIMELINE_HOME_HYDRATION",
+        "line": 117,
+        "rules": 87
+      },
+      {
+        "file": "visibility-filtering/rules/levels.rs",
+        "id": "IMMERSIVE_EXPANDED_RECOMMENDATIONS",
+        "line": 207,
+        "rules": 47
+      }
+    ],
+    "non_follower_rules": [
+      {
+        "file": "visibility-filtering/rules/author_rules.rs",
+        "line": 35,
+        "rule": "PROTECTED_AUTHOR_DROP"
+      },
+      {
+        "file": "visibility-filtering/rules/author_rules.rs",
+        "line": 144,
+        "rule": "ABUSIVE_HIGH_RECALL_USER_LABEL_DROP_UNSPECIFIED"
+      },
+      {
+        "file": "visibility-filtering/rules/author_rules.rs",
+        "line": 151,
+        "rule": "DO_NOT_AMPLIFY_USER_LABEL_DROP_UNSPECIFIED"
+      },
+      {
+        "file": "visibility-filtering/rules/tweet_rules.rs",
+        "line": 133,
+        "rule": "FOSNR_ABUSE_INSULTS_NON_FOLLOWER_DROP_UNDESIRABLE"
+      }
+    ],
+    "recommendations_only": [
+      "ABUSIVE_HIGH_RECALL_USER_LABEL_DROP_UNSPECIFIED",
+      "BRAZIL_ELECTION_LEGAL_DROP_UNDESIRABLE",
+      "COMPROMISED_USER_LABEL_DROP_UNSPECIFIED",
+      "DMCA_MEDIA_DROP_UNSPECIFIED",
+      "DO_NOT_AMPLIFY_DROP_UNDESIRABLE",
+      "DO_NOT_AMPLIFY_USER_LABEL_DROP_UNSPECIFIED",
+      "FOSNR_ABUSE_INSULTS_DROP_UNDESIRABLE",
+      "GEO_RESTRICTED_MEDIA_DROP_UNSPECIFIED",
+      "GORE_AND_VIOLENCE_HIGH_PRECISION_DROP_NSFW_MEDIA",
+      "IMPERSONATION_HIGH_PRECISION_USER_LABEL_DROP_UNSPECIFIED",
+      "MALICIOUS_URL_DROP_UNDESIRABLE",
+      "NSFW_ADMIN_AUTHOR_DROP_NSFW_MEDIA",
+      "NSFW_ADMIN_TWEET_FLAG_DROP_NSFW_MEDIA",
+      "NSFW_AVATAR_IMAGE_USER_LABEL_DROP_UNSPECIFIED",
+      "NSFW_BANNER_IMAGE_USER_LABEL_DROP_UNSPECIFIED",
+      "NSFW_CARD_IMAGE_DROP_NSFW_MEDIA",
+      "NSFW_HIGH_PRECISION_DROP_NSFW_MEDIA",
+      "NSFW_HIGH_PRECISION_USER_LABEL_DROP_UNSPECIFIED",
+      "NSFW_HIGH_RECALL_DROP_NSFW_MEDIA",
+      "NSFW_HIGH_RECALL_USER_LABEL_DROP_UNSPECIFIED",
+      "NSFW_NEAR_PERFECT_USER_LABEL_DROP_UNSPECIFIED",
+      "NSFW_USER_AUTHOR_DROP_NSFW_MEDIA",
+      "NSFW_USER_TWEET_FLAG_DROP_NSFW_MEDIA",
+      "READ_ONLY_USER_LABEL_DROP_UNSPECIFIED",
+      "SPAM_HIGH_RECALL_DROP_UNDESIRABLE",
+      "SPAM_HIGH_RECALL_USER_LABEL_DROP_UNSPECIFIED"
+    ],
+    "verdict": {
+      "file": "visibility-filtering/models/verdict.rs",
+      "line": 7
+    }
+  }
+}

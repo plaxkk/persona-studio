@@ -1,0 +1,1051 @@
+{
+  "exclude": {
+    "home-mixer/params/param.rs::VideoCarouselImmersiveVqvWeight": "属于视频轮播（Jetfuel/VideoCarousel）那一组，当前版本整组是关的（`EnableVideoCarousel = false`）——关着的分支里的权重算不进当前逻辑。",
+    "home-mixer/params/param.rs::VideoCarouselVideoOpenWeight": "属于视频轮播（Jetfuel/VideoCarousel）那一组，当前版本整组是关的（`EnableVideoCarousel = false`）——关着的分支里的权重算不进当前逻辑。",
+    "vm-ranker/params.rs::BidirectionalFollowDwellWeightBoost": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::BidirectionalFollowReplyWeightBoost": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::BlockAuthorWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ClickWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ContClickDwellTimeWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ContDwellTimeWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::DwellWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::FavoriteWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::FollowAuthorWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::MuteAuthorWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::NotDwelledWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::NotInterestedWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::OpenLinkWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::PhotoExpandWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::PostUnexploredWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ProfileClickWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ProfileVisitSecsWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::QuoteWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::QuotedClickWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::QuotedVqvWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ReactWithVideoWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ReplyWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ReportWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::RetweetWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ShareViaCopyLinkWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ShareViaDmWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::ShareWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::UserVideoContinuationWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::VideoContinuationWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::VideoOpenWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。",
+    "vm-ranker/params.rs::VqvWeight": "同名参数 `home-mixer/params/param.rs` 里已经有一条，清单只引那一份。两份文件给的值不一定一样——差在哪由清单的 `conflicts` 段机器列出，不在这里手抄，抄错一个数就是编。"
+  },
+  "groups": [
+    {
+      "id": "follow_graph",
+      "note": "这一区排在最前面，因为它是「涨粉」这条线上唯一有**官方文档**记着来龙去脉的一段。上游在 `docs/BIDIRECTIONAL_BOOST_CHANGE.md` 里写了互关回复加成怎么从 5/10/15/20 里选定、什么时候全量、又为什么从 20 改回 15。区内的次序是我们编的（这些数不同量纲：权重、开关、天数、秒数），**官方给的值照样摆在每一行里**。",
+      "title": "互相关注与涨粉"
+    },
+    {
+      "id": "engagement_positive",
+      "note": "区内**按官方数值降序**——等级就是上游给的那个数，不是我们算的综合分。读这张表之前先看清单顶部那条上游自己的警告：这些数乘的是**预测概率**，不是次数，所以跨动作比大小没有意义；一个数小不代表那个动作不重要，可能只是它的基线概率本来就高。「关注作者」（4.0）在上一区，因为它的目标是涨粉。",
+      "rank_by": "desc",
+      "ranked": true,
+      "title": "正向互动权重"
+    },
+    {
+      "id": "engagement_negative",
+      "note": "**按绝对值降序**，不是按数值降序——`-234` 混在降序表里会排到最后，看上去最不重要，而它恰恰是最强的一条。绝对值大同样**不**等于「一个举报抵几百个赞」，理由见清单顶部。",
+      "rank_by": "abs",
+      "title": "负向互动权重"
+    },
+    {
+      "id": "multipliers",
+      "note": "这一区不在上面那把尺子上（单位是系数、常数，不是权重），所以**不按大小排**，次序是我们按「影响面排序」编的。它们的作用方式是把别的分数**乘一下**，而不是自己加进去。",
+      "title": "乘子与折扣"
+    },
+    {
+      "id": "gates",
+      "note": "这一区决定**某些项算不算数**。不合格通常是**把那一项的权重归零**，不是扣分——所以「门槛」和「权重」是两种不同的东西，不能混在一起排大小。",
+      "title": "门槛与资格"
+    },
+    {
+      "id": "cold_start",
+      "note": "上游 README 里管这个叫 New-Author Boost。**它的实现是抬位置、不是加分**——`apply_cold_start_decisions` 里写的是 `effective[i] = max(effective[i], ranked[rank])`，也就是把分数顶到「第 15 名那条帖的分数」。所以它保证的是「进前 15~16 位」，不是「加 15 分」。这一条对刚起号的人最直接。",
+      "title": "新作者冷启动"
+    }
+  ],
+  "include": {
+    "home-mixer/params/param.rs::BidirectionalFollowDwellWeightBoost": {
+      "condition": "同上一行的条件",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "互关作者的原创帖：停留权重加成",
+      "note": "同一份官方文档说这个「停留加成」试过但**没铺开**，所以当前是 0.0。0 不代表没设计过，代表当前版本没启用——这正是本页要区分的东西。",
+      "order": 2,
+      "target": [
+        "flow"
+      ],
+      "unit": "boost"
+    },
+    "home-mixer/params/param.rs::BidirectionalFollowReplyWeightBoost": {
+      "condition": "帖是原创；作者和你互相关注；并且这次服务发生在 For You 流里",
+      "direction": "positive",
+      "group": "follow_graph",
+      "name": "互关作者的原创帖：回复权重加成",
+      "note": "官方文档 `docs/BIDIRECTIONAL_BOOST_CHANGE.md` 记了它的来历：2026-07-10 起 A/B 测 5/10/15/20，07-13 全量上 20，07-24 降到 15（理由是「人们看不到足够多来自未关注账号的讨论」）。它抬的不是回复**次数**，是「预测你会回复」这个概率上乘的那个权重。对人话就是：你发原创帖，跟你互关的人更容易在推荐流里看到它。",
+      "order": 1,
+      "target": [
+        "follower",
+        "flow"
+      ],
+      "unit": "boost"
+    },
+    "home-mixer/params/param.rs::BlockAuthorWeight": {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "name": "拉黑该作者",
+      "note": "31.2。值得注意的是它**比屏蔽还低**——拉黑是一次性的关系切断，之后这个人就不再进入你的候选池，所以不需要靠一个更大的负权重来压。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ClickWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "点进这条帖",
+      "note": "0.3——点开看详情这个动作。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ColdStartBetaAlpha0": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "name": "采样的 Beta 先验 α₀",
+      "note": "和下一行一起读。",
+      "order": 8,
+      "target": [
+        "flow"
+      ],
+      "unit": "constant"
+    },
+    "home-mixer/params/param.rs::ColdStartBetaBeta0": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "name": "采样的 Beta 先验 β₀",
+      "note": "0.75 / (0.75 + 49.25) ≈ 0.015——先验的期望很低，意思是「默认认为新东西不好，要有证据才抬」。",
+      "order": 9,
+      "target": [
+        "flow"
+      ],
+      "unit": "constant"
+    },
+    "home-mixer/params/param.rs::ColdStartFollowerCap": {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "name": "作者粉丝数上限",
+      "note": "作者粉丝数 ≤ 50000 才够格。粉丝多的作者不吃这个加成。",
+      "order": 3,
+      "target": [
+        "flow"
+      ],
+      "unit": "count"
+    },
+    "home-mixer/params/param.rs::ColdStartImpressionScale": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "name": "曝光数的缩放",
+      "note": "1.0，当前等于不缩放。",
+      "order": 11,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "home-mixer/params/param.rs::ColdStartImpressionThreshold": {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "name": "曝光多少以下算「冷」",
+      "note": "**200**——而且算的是**在你首页的曝光数**（代码里是 `view_count_on_home`），不是全站曝光。也就是说这是一个针对「你」的阈值，同一条帖对不同的人算不算冷启动可以不一样。",
+      "order": 2,
+      "target": [
+        "flow"
+      ],
+      "unit": "count"
+    },
+    "home-mixer/params/param.rs::ColdStartMaxPostAgeSecs": {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "name": "帖子的新鲜度要求",
+      "note": "7200 秒 = 2 小时内发的帖才算。",
+      "order": 4,
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds"
+    },
+    "home-mixer/params/param.rs::ColdStartSlotMax": {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "name": "抬到的位置（上界）",
+      "note": "第 16 位。所以这条加成保证的是「进前 15~16 位」，不是「排第一」。",
+      "order": 6,
+      "target": [
+        "flow"
+      ],
+      "unit": "position"
+    },
+    "home-mixer/params/param.rs::ColdStartSlotMin": {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "name": "抬到的位置（下界）",
+      "note": "第 15 位。这一区抬的是**位置**不是分数：把你的分数顶到「第 15 名那条帖的分数」。",
+      "order": 5,
+      "target": [
+        "flow"
+      ],
+      "unit": "position"
+    },
+    "home-mixer/params/param.rs::ColdStartTsTopK": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "name": "每轮最多从几个候选里选",
+      "note": "2 个。",
+      "order": 10,
+      "target": [
+        "flow"
+      ],
+      "unit": "count"
+    },
+    "home-mixer/params/param.rs::ContClickDwellTimeWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "点进去之后的停留时长",
+      "note": "这一项乘的是连续的**秒数**，不是概率——所以它是本区里唯一不能按「概率权重」读的一条。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ContDwellTimeWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "连续停留的秒数",
+      "note": "**两份源码给的数不一样**：这里是 0.006，`vm-ranker/params.rs` 给的是 0.004。清单引 home-mixer 这一份，差在哪在页尾照实列出。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::DwellWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "停留（有 / 无）",
+      "note": "二值的「停留了」信号，和上面按秒算的那条不是一回事。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::EnableBidirectionalFollowHydration": {
+      "condition": "",
+      "direction": "positive",
+      "group": "follow_graph",
+      "name": "加载「谁跟你互关」这份数据",
+      "note": "上面那两条加成得先知道谁跟你互关才算得出来。这个开关是那份数据的来源，关掉它加成就是死的。当前是开的。",
+      "order": 3,
+      "target": [
+        "follower"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableColdStartThompsonSampling": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "name": "用 Thompson 采样选该抬哪条",
+      "note": "开着。避免每次都抬同一类内容。",
+      "order": 7,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableExplicitEngagementSignals": {
+      "condition": "",
+      "direction": "positive",
+      "group": "gates",
+      "name": "显式互动信号",
+      "note": "把你明确做过的互动（点赞、回复……）当特征用。",
+      "order": 7,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableFollowingRepliedUsersFacepile": {
+      "condition": "",
+      "direction": "positive",
+      "group": "gates",
+      "name": "「你关注的人也回复了」提示",
+      "note": "当前 **false**——这个提示位没开。",
+      "order": 11,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableImplicitEngagementSignals": {
+      "condition": "",
+      "direction": "positive",
+      "group": "gates",
+      "name": "隐式互动信号",
+      "note": "把停留、划过这类没有明说动作的信号也当特征用。",
+      "order": 8,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableIpFeature": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "使用 IP 特征",
+      "note": "开着。这是按地区做合规限制（比如某些国家屏蔽某类内容）的输入之一。",
+      "order": 10,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableMutualFollowJaccardHydration": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "互关相似度特征（当前关）",
+      "note": "另一套「共同关注」的相似度特征，用来估你和作者的关系强度。当前 **false**。",
+      "order": 11,
+      "target": [
+        "follower"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableNewUserMinEngagementFilter": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "新账号最低互动门槛（当前关）",
+      "note": "「新帖得有人互动才继续推」的那类机制。当前是 **false**——关着。读到它的时候要连着下一行的阈值一起读。",
+      "order": 8,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnablePhoenixRetrievalFallback": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "召回兜底路径",
+      "note": "当前 false。",
+      "order": 13,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableQuotedVqvDurationCheck": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "被引用视频也查时长",
+      "note": "当前 false——被引用的视频不查这 10 秒。",
+      "order": 5,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableServedFilterAllRequests": {
+      "condition": "",
+      "direction": "negative",
+      "group": "gates",
+      "name": "推过的不再推",
+      "note": "所有请求都过滤掉已经推给过你的帖。",
+      "order": 1,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableViewerColdStart": {
+      "condition": "",
+      "direction": "positive",
+      "group": "cold_start",
+      "name": "对着「某作者你很少见」做冷启动",
+      "note": "开着。你对某个作者的曝光数低于阈值时，会把 ta 的内容抬一把。",
+      "order": 1,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EnableWhoToFollowModule": {
+      "condition": "",
+      "direction": "positive",
+      "group": "follow_graph",
+      "name": "「关注谁」模块",
+      "note": "信息流里那个推荐关注对象的模块。开着才有这个曝光位。",
+      "order": 5,
+      "target": [
+        "follower"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::EngagementSignalsMaxPerType": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "每类互动信号最多取几条",
+      "note": "15 条。「看得越多越懂你」这件事有个 15 条的封顶。",
+      "order": 9,
+      "target": [
+        "flow"
+      ],
+      "unit": "count"
+    },
+    "home-mixer/params/param.rs::ExcludeServedTweetIdsDuration": {
+      "condition": "",
+      "direction": "negative",
+      "group": "gates",
+      "name": "推过的帖多久内不再出现",
+      "note": "10 分钟。",
+      "order": 2,
+      "target": [
+        "flow"
+      ],
+      "unit": "minutes"
+    },
+    "home-mixer/params/param.rs::ExcludeServedTweetIdsNumber": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "记住最近多少条推过的帖",
+      "note": "100 条。",
+      "order": 3,
+      "target": [
+        "flow"
+      ],
+      "unit": "count"
+    },
+    "home-mixer/params/param.rs::FavoriteWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "点赞",
+      "note": "点赞是 0.66，**比转推（1.0）还低**。因为「预测你会点赞」的基线概率高——大家本来就常点赞，概率高，权重不用大就能影响结果。**这不代表点赞没用**，只代表它不该和转推比大小。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::FollowAuthorWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "follow_graph",
+      "name": "关注作者（在 For You 流里点关注）",
+      "note": "管的是「从推荐流里关注了这个人」这个动作。它和回复 / 引用 / 私信分享（都是 5.0）同档，是「涨粉」在排序里唯一的直接正向项。",
+      "order": 4,
+      "target": [
+        "follower"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::LowImpressionsMaxPositionRatio": {
+      "condition": "",
+      "direction": "negative",
+      "group": "cold_start",
+      "name": "低曝光帖的位置比例",
+      "note": "0.97——曝光少的帖按 0.97 的位置比例处理，等于差点被压到最末尾。",
+      "order": 12,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "home-mixer/params/param.rs::MinVideoDurationMs": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "视频计入门槛",
+      "note": "视频要够 10 秒才进入和视频有关的那些计算。",
+      "order": 4,
+      "target": [
+        "flow"
+      ],
+      "unit": "milliseconds"
+    },
+    "home-mixer/params/param.rs::MuteAuthorWeight": {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "name": "屏蔽该作者",
+      "note": "绝对值 58.8，比「不感兴趣」（52.272）还高一点：屏蔽是更强的表态。它绝对值大同样是因为这个动作稀有，不是因为「一个屏蔽抵多少个赞」。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::NewUserMinEngagementFilterMaxAccountAgeSecs": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "「新账号」的年龄定义",
+      "note": "注册 1800 秒（30 分钟）以内才算新账号，超出这个年纪就不再吃上面那条门槛。",
+      "order": 10,
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds"
+    },
+    "home-mixer/params/param.rs::NewUserMinEngagementThreshold": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "上面那个门槛的阈值",
+      "note": "0.0。配合「开关是 false」一起读：现在等于没有这道门槛。",
+      "order": 9,
+      "target": [
+        "flow"
+      ],
+      "unit": "threshold"
+    },
+    "home-mixer/params/param.rs::NotDwelledWeight": {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "name": "划过去没停留",
+      "note": "绝对值很小（0.02），但它是「沉默的负反馈」——一次不值钱，量大就值钱。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::NotInterestedWeight": {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "name": "点了「不感兴趣」",
+      "note": "**两份源码给的数不一样**：这里是 -52.272，`vm-ranker/params.rs` 给的是 -47.52。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::OpenLinkWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "打开外链",
+      "note": "0.2——帖子里挂了外链并且真的点开了。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::PhoenixColdStartMaxResults": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "cold_start",
+      "name": "冷启动召回的条数上限",
+      "note": "200 条。",
+      "order": 13,
+      "target": [
+        "flow"
+      ],
+      "unit": "count"
+    },
+    "home-mixer/params/param.rs::PhoenixRankerNewUserHistoryThreshold": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "新账号的排序历史门槛",
+      "note": "0 秒——等于没有门槛，新账号也走正常排序模型。",
+      "order": 14,
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds"
+    },
+    "home-mixer/params/param.rs::PhoenixRetrievalExcludeSeenPosts": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "召回阶段排除看过的帖",
+      "note": "false——召回阶段不排除，靠上面的 served filter 在最后一步兜。",
+      "order": 12,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "home-mixer/params/param.rs::PhoenixRetrievalNewUserHistoryThreshold": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "新账号的召回历史门槛",
+      "note": "0 秒，同上。",
+      "order": 15,
+      "target": [
+        "flow"
+      ],
+      "unit": "seconds"
+    },
+    "home-mixer/params/param.rs::PhotoExpandWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "展开图片",
+      "note": "0.05——多图帖里点开看图。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::PostUnexploredWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "「没探索过的内容」",
+      "note": "给没见过的话题一点曝光。当前只作用于站内内容，见门槛区的 `PostUnexploredIncludeOutOfNetwork = false`。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ProfileClickWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "点作者头像",
+      "note": "当前是 0.0——这一项现在不往总分里加东西。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::QuoteWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "引用",
+      "note": "引用一条帖并加上自己的话。量级和回复、私信分享齐平（5.0），是转推（1.0）的五倍。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::QuotedClickWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "点击被引用的那条帖",
+      "note": "0.05——从引用帖跳到原帖去看。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::QuotedVqvWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "被引用的视频完播",
+      "note": "当前是 0.0。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ReactWithVideoWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "用视频回应",
+      "note": "当前是 0.0。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ReplyWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "回复",
+      "note": "回复是「对话」信号。注意它会被互关加成抬：在互关作者的原创帖上，这一项的权重实际是 5.0 + 15.0。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ReportWeight": {
+      "condition": "",
+      "direction": "negative",
+      "group": "engagement_negative",
+      "name": "举报这条帖",
+      "note": "绝对值最大的一条负向。上游专门写了一段解释它为什么这么大：举报的基线概率比点赞低一千倍以上，不放大就根本影响不了排序。**不能读成「一个举报抵几百个赞」。**还有一条更要紧：只有在你自己的首页时间线里**真实看到这条帖之后**做出的举报才算数——直接点进某条帖的链接（比如群里发的）对排序没有影响。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::RetweetWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "转推",
+      "note": "1.0。其他数看起来都是相对它而言，但按上游那条警告，这个「相对」是在**概率空间**里的相对，不是次数上的相对。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ShareViaCopyLinkWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "复制链接分享",
+      "note": "当前版本里单条最高的正向权重。上游那条警告在这里最要紧：20 是乘在「预测你会复制链接」的概率上，不是「一次复制链接抵 30 个赞」。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ShareViaDmWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "私信分享",
+      "note": "把帖发给某一个具体的人，比公开转发的意愿更强，所以是 5.0 而不是 2.0。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::ShareWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "分享（泛指）",
+      "note": "不指定分享到哪里的那一种分享，2.0——正好是转推的两倍。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::VideoOpenWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "打开视频",
+      "note": "两份 param 文件给的值不一样（`vm-ranker/params.rs` 是 0.07），见页尾「两份源码给的数不一样」。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::VqvWeight": {
+      "condition": "",
+      "direction": "positive",
+      "group": "engagement_positive",
+      "name": "视频完播",
+      "note": "当前是 0.0。上游代码里它是「合格才计」的一项（`vqv_eligible`），但权重本身就是 0。",
+      "order": 0,
+      "target": [
+        "flow"
+      ],
+      "unit": "weight"
+    },
+    "home-mixer/params/param.rs::WhoToFollowFatigueHours": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "「关注谁」的疲劳期",
+      "note": "同一个「关注谁」推荐对同一个人 30 小时内不重复出现。",
+      "order": 6,
+      "target": [
+        "follower"
+      ],
+      "unit": "hours"
+    },
+    "user-cred-v2/UserCredV2Config.scala::EngagementWindowDays": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "follow_graph",
+      "name": "账号信用只回看 7 天互动",
+      "note": "UserCredV2（账号信用）算互动时只看最近 7 天。也就是说历史互动**不是永久资产**，7 天前的表现在这里基本不再计入。",
+      "order": 7,
+      "target": [
+        "follower"
+      ],
+      "unit": "days"
+    },
+    "vm-ranker/params.rs::AuthorDiversityDecay": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "作者多样性衰减系数",
+      "note": "公式是 `(1 - floor) × decay^k + floor`，k 是同一位作者在这一屏里出现的第几条。",
+      "order": 6,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "vm-ranker/params.rs::AuthorDiversityFloor": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "作者多样性折扣下限",
+      "note": "floor = 0.25 表示打折有下限：同作者第 1 条是 0.75×，第 2 条 0.625×，一路逼近但不会低于 0.25×。",
+      "order": 7,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "vm-ranker/params.rs::DppEnabled": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "多样性重排（DPP）",
+      "note": "开着（true）。它在排序之后再做一次「别都长一个样」的重排。",
+      "order": 11,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "vm-ranker/params.rs::DppMaxSelectedRank": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "DPP 只作用于前多少名",
+      "note": "只在前 150 名里重排，再往后的位置不管。",
+      "order": 13,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "vm-ranker/params.rs::DppTheta": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "DPP 的多样性强度",
+      "note": "0.65。越大越强制多样，越小越放任相似内容扎堆。",
+      "order": 12,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "vm-ranker/params.rs::EnableAuthorDiversity": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "作者多样性",
+      "note": "同一个人连着出现会被打折，防止一个人的内容铺满整个首页。",
+      "order": 5,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "vm-ranker/params.rs::EnableOonRescoreForInNetworkRepliesRetweets": {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "name": "站内的回复/转推也按站外再算一遍",
+      "note": "开着（true）。所以「已经关注了」不等于豁免折扣——站内的回复和转推要再挨一次。",
+      "order": 4,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "vm-ranker/params.rs::MultiplierPreOffset": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "乘子与负分压缩的次序",
+      "note": "控制「先压缩负分再加乘子」还是反过来。当前 false。",
+      "order": 8,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "vm-ranker/params.rs::NewUserOonWeightFactor": {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "name": "新账号看站外内容",
+      "note": "0.00001——新账号的首页几乎只推已经关注的内容。",
+      "order": 3,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "vm-ranker/params.rs::OonWeightFactor": {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "name": "站外内容折扣",
+      "note": "你没关注的人发的内容，整体乘 0.75。「站外 / 站内」（out-of-network / in-network）指的就是你和作者之间有没有关注关系。",
+      "order": 1,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "vm-ranker/params.rs::PostUnexploredIncludeOutOfNetwork": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "gates",
+      "name": "「没探索过的内容」是否含站外",
+      "note": "false = 只作用于站内。这就是正向区里 `PostUnexploredWeight` 生效范围的上限。",
+      "order": 6,
+      "target": [
+        "flow"
+      ],
+      "unit": "gate"
+    },
+    "vm-ranker/params.rs::TopicOonWeightFactor": {
+      "condition": "",
+      "direction": "negative",
+      "group": "multipliers",
+      "name": "话题维度的站外折扣",
+      "note": "0.5，比整体的 0.75 更狠。",
+      "order": 2,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "vm-ranker/params.rs::WeightPerturbationSalt": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "权重扰动的盐",
+      "note": "上面那个扰动的随机器种。空字符串，配合 0.0 一起读：扰动没启用。",
+      "order": 10,
+      "target": [
+        "flow"
+      ],
+      "unit": "constant"
+    },
+    "vm-ranker/params.rs::WeightPerturbationSigma": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "权重扰动幅度",
+      "note": "官方会按用户给每个权重乘 `exp(±sigma)`（防过拟合）。当前 0.0 = **关着**。",
+      "order": 9,
+      "target": [
+        "flow"
+      ],
+      "unit": "multiplier"
+    },
+    "xai-value-model/weights.rs::NEGATIVE_SCORES_OFFSET": {
+      "condition": "",
+      "direction": "neutral",
+      "group": "multipliers",
+      "name": "负分压缩常量",
+      "note": "**负分不是直接减。** 上游把所有负分压进 `0..0.001` 这一段（`(combined + negative_sum) / total_sum × 0.001`），正分则统一加 0.001。所以 `ReportWeight = -234` 不是「从总分里减 234」。",
+      "order": 14,
+      "target": [
+        "flow"
+      ],
+      "unit": "constant"
+    }
+  },
+  "not_listed": [
+    {
+      "detail": "Grox 那几条流程的提示词在本版本里是**上游主动剔除**的，不是我们没找到。三个文件里写着同一句原话：「As stated in README for the open source repo, prompts are excluded to reduce gameability of the system.」所以这一条的性质和「我们没读」完全不同：它是上游明确说「不公开」。",
+      "evidence": [
+        "grox/flows/reply_spam/prompts.py:12 —— 上述原话",
+        "grox/flows/upa/prompts.py:12 —— 同上",
+        "grox/flows/ptos/prompts.py:12 —— 同上",
+        "全仓库 0 个 .j2 文件；grox/flows 下 0 个 templates/ 目录"
+      ],
+      "kind": "withheld",
+      "title": "Grox 的提示词（上游自己剔除了）"
+    },
+    {
+      "detail": "仓库里有**训练代码**和合成数据生成代码，能跑一次概念验证训练；但线上在用的那个训练产物不在仓库里。所以「模型学到的是什么」这件事我们只能看到它出哪些「头」（点赞、回复、停留……）以及这些头怎么被加权，看不到权重矩阵本身。",
+      "evidence": [
+        "全仓库 0 个 .pt / .safetensors / .ckpt / .onnx / .bin 模型文件",
+        "README:48 —— 用「训练所用的代码」替换了原先的 Phoenix 演示模型，并给了合成数据生成，好让人能跑一次概念验证训练"
+      ],
+      "kind": "not_public",
+      "title": "线上在跑的那个 Phoenix 模型本身"
+    },
+    {
+      "detail": "有些阈值既不在 `params/param.rs` 里、也不在配置里，而是直接写死在某个 scorer 或 filter 的代码里。这一类**能读到，但本次没有逐条读**——只有冷启动那一个 scorer 是逐行读过的（`home-mixer/scorers/author_cold_start.rs`）。写在这里免得读的人以为「清单里没有 = 上游没有」。",
+      "evidence": [
+        "本次逐行读过的只有 home-mixer/scorers/author_cold_start.rs",
+        "其余 scorer / filter 未逐条读；不属于本次范围"
+      ],
+      "kind": "unread",
+      "title": "散落在各 scorer / filter 里的硬编码字面量"
+    },
+    {
+      "detail": "按本次范围约定不列：召回与索引（SimClusters、SID、Popular Posts）、缓存与 TTL、Kafka 上报、集群与推理部署（cluster id、retry、shadow traffic）、广告注入、模型结构本身。这些确实影响系统，但不是「这条帖为什么被推给你」这一层的逻辑。",
+      "evidence": [
+        "本次范围：只列流量与涨粉相关；负向信号与可见性限制算在内"
+      ],
+      "kind": "out_of_scope",
+      "title": "和流量/涨粉无关的工程细节"
+    }
+  ],
+  "note": "这份文件是**人写的那一半**：中文名、目标（流量/涨粉）、方向、生效条件、一句话解释、以及「为什么不收某条」。机器抽出来的那半边（官方标识符、数值、文件、行号、原文）由 `scripts/parse_algorithm_signals.py` 从上游源码里抓，两者合并成 `assets/web-admin/src/data/algorithmSignals.json`。所以**不要**在这里手写任何数值——数值一律以机器抽到的为准。"
+}
