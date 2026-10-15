@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, Microscope, Plus, RefreshCw } from "lucide-react";
 import { api, safeXUrl, time } from "../api";
 import type { Studio, Actions } from "../types";
@@ -73,6 +73,9 @@ export default function Benchmarks({
       null,
     ),
     [loading, setLoading] = useState(true);
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  const selectedRef = useRef("");
   const busy = data.overview.tasks.filter(
     (t) => ["queued", "running"].includes(t.status),
   );
@@ -90,10 +93,11 @@ export default function Benchmarks({
         `/benchmarks/deconstructions/${handle}`,
       ),
     ]);
+    if (selectedRef.current !== handle) setOpenDoc(null);
+    selectedRef.current = handle;
     setSelected(handle);
     setPosts(thread.posts);
     setDocs(saved.deconstructions);
-    setOpenDoc(null);
   }, []);
 
   const load = useCallback(
@@ -110,8 +114,10 @@ export default function Benchmarks({
         list.accounts[0]?.handle ||
         "";
       if (!pick) {
+        selectedRef.current = "";
         setSelected("");
         setPosts([]);
+        setOpenDoc(null);
         return;
       }
       await openAccount(pick);
@@ -119,10 +125,11 @@ export default function Benchmarks({
     [openAccount],
   );
 
-  // The first load runs once; `load` is stable unless `openAccount` changes.
+  // A new Actions object is passed on every app render. Depending on it here
+  // would restart the first load and close an open deconstruction repeatedly.
   useEffect(() => {
-    void actions.run(() => load()).finally(() => setLoading(false));
-  }, [actions, load]);
+    void actionsRef.current.run(() => load()).finally(() => setLoading(false));
+  }, [load]);
 
   // A read runs for minutes inside the browser, so the panel keeps looking while
   // it does instead of making the operator reload the page to see the result.
