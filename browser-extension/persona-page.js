@@ -38,11 +38,11 @@ export async function readPersonaPage(action, expected) {
     // lowercased handle; it has to be the target's own link, not a follower
     // card's, or a small account's followers number would be read as its own.
     const link = (suffix) =>
-      [...primary.querySelectorAll(`a[href$="/${suffix}"]`)].find((node) => {
+      [...primary.querySelectorAll('a[href$="/followers"],a[href$="/verified_followers"],a[href$="/following"]')].find((node) => {
         const match = node
           .getAttribute("href")
           ?.match(/^\/([A-Za-z0-9_]{1,15})\/(?:verified_)?(followers|following)$/);
-        return match && match[1].toLowerCase() === target.toLowerCase();
+        return match && match[1].toLowerCase() === target.toLowerCase() && match[2] === suffix;
       });
     const followersLink = link("followers");
     if (!followersLink) return { state: "waiting_browser" };

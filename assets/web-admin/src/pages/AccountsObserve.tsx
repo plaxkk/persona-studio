@@ -163,6 +163,44 @@ const show = (value: number | null, unit: string) =>
     ? NO_DATA
     : `${value.toLocaleString("zh-CN", { maximumFractionDigits: 3 })}${unit}`;
 
+// The rule ledger includes internal specification references for audit. Keep
+// the underlying data intact, but show readers the observation itself.
+const publicReason = (value: string) =>
+  value
+    .replace(/（[^）]*(?:方案|§|06C-|线由本机定)[^）]*）/g, "")
+    .replace(/方案\s*§[一二三四五六\d]+/g, "")
+    .replace(/空壳互动者/g, "资料很少的互动账号")
+    .replace(/模板回复/g, "重复或套话式回复")
+    .replace(/粉丝口径互动率/g, "按粉丝数计算的互动率")
+    .replace(/意向评论密度/g, "表达购买或合作意向的评论占比")
+    .replace(/词面代理/g, "按常用词估算")
+    .replace(/弱代理/g, "参考线索")
+    .replace(/互动者共现率/g, "同一批人是否反复互动")
+    .replace(/\*\*/g, "")
+    .replace(/本片/g, "目前")
+    .replace(/这条通道/g, "公开页面")
+    .trim();
+
+const missingReason: Record<string, string> = {
+  auth_burst_and_relevance: "公开页面没有每次点赞和回复的发生时间，暂时无法判断互动是否集中在短时间内。",
+  auth_engagement_too_high: "还没有可靠的对照范围，暂时无法判断互动率是否异常偏高。",
+  pro_information_density: "目前没有读取内容中的数字、图表和代码细节，暂时无法判断信息量。",
+  pro_quoted_substance: "目前没有读到别人引用这条内容时写的正文，无法判断引用是否在认真讨论。",
+  pro_negative_handling: "公开页面无法确认已删除的评论，也无法稳定区分解释和争吵。",
+  mon_verified_share: "搜索结果没有提供互动者的认证信息，暂时无法计算认证账号的互动占比。",
+  flag_burst_farm: "公开页面没有每次点赞的时间，无法判断是否集中在发布后的几分钟。",
+  flag_pod_co_engagement: "只读一个账号，无法判断同一批人是否也反复出现在其他账号下面。",
+  flag_unverified_pnl_claim: "还需要结合原帖与后续复盘人工核对，不能只凭晒单截图下结论。",
+  flag_like_list_astroturf: "别人的点赞名单不可完整读取，无法核对这些赞来自谁。",
+};
+
+const explainMissing = (rule: SkippedRule, labels: Map<string, string>) => {
+  if (missingReason[rule.id]) return missingReason[rule.id];
+  const names = rule.blocked.match(/^需要 (.+)，这一次没有读到$/)?.[1];
+  if (names) return `还缺少${names.split("、").map((name) => labels.get(name) || name).join("、")}，暂时无法判断。`;
+  return publicReason(rule.blocked);
+};
+
 export default function AccountsObserve({
   data,
   actions,
@@ -255,8 +293,10 @@ export default function AccountsObserve({
   };
   // 未知的特征也要显示，而且要把为什么未知写在旁边——这一层的价值就在这里。
   const grouped = new Map<string, Feature[]>();
+  const featureLabels = new Map<string, string>();
   for (const feature of run?.values || []) {
     grouped.set(feature.layer, [...(grouped.get(feature.layer) || []), feature]);
+    featureLabels.set(feature.name, feature.label);
   }
   const layers = [
     ...LAYERS.filter((layer) => grouped.has(layer)),
@@ -267,11 +307,8 @@ export default function AccountsObserve({
     <>
       <Heading
         eyebrow="06C 账号观察"
-        title="这个号像不像真人"
-        description={"先把“这个账号的行为特征读不读得到”回答清楚，再按固定规则给出真实性 / 专业性 /"
-          + "盈利能力三个 0–100 分，最后按规则打风险硬标签。分数是「先一票否决、再加减分」"
-          + "算出来的连续分，硬标签说的是「这件事本身被看见了」，两件事互不代替；"
-          + "命中过的账号会进「复核室」，等人工复核。"}
+        title="看看这个账号有哪些值得留意的信号"
+        description="先读取公开主页、内容和互动，再分别看账号的真实互动、专业表达与商业线索。每个判断都附来源；资料不足时会直接说明。需要核实的迹象留给你在复核室判断。"
         action={
           run?.confidence ? (
             <Badge tone={CONFIDENCE[run.confidence]?.green ? "green" : ""}>
@@ -438,24 +475,16 @@ export default function AccountsObserve({
               ) : (
                 <>
                   <p className="notice">
-                    下面每题都是读过的东西直接数出来的量，分数就是站在这些量上算的：先一票否决
-                    （封顶）、再加减分，<strong>没有权重</strong>。哪条规则跑过、哪条没评，都跟在每个分后面。
-                    样本门槛是原帖 {detail.thresholds.min_post_sample} 条、收到的回复{" "}
-                    {detail.thresholds.min_reply_sample} 条，不到就标「样本偏少」；
-                    公开读取上限 {detail.thresholds.limit} 条。
+                    分数依据这次读到的公开内容计算。样本不足时不会给出确定判断：至少需要原帖{" "}
+                    {detail.thresholds.min_post_sample} 条、收到的回复{" "}
+                    {detail.thresholds.min_reply_sample} 条；每类最多读取 {detail.thresholds.limit} 条。
                   </p>
 
                   {/* 分数在特征之前：它是这一片的结论，而下面每一层都是它的证据。
                       一个分显示「暂无数据」时，缺的是证据，不是这个账号得了 0 分。 */}
                   <Field
                     label="三个分"
-                    hint={
-                      run.score
-                        ? `规则版本 ${ledger.version || run.score.rule_version}；`
-                          + `${ledger.model_note || "模型层未建"}。`
-                          + "分数在工作室里算，面板只显示它算出来的账。"
-                        : "这一片的分数由工作室按固定规则算，面板只显示结果。"
-                    }
+                    hint="分别看真实互动、专业表达和商业线索。分数是当前样本下的参考，不代表事实认定。"
                   >
                     {ledger.scores.length ? (
                       <div className="score-ledger">
@@ -476,7 +505,7 @@ export default function AccountsObserve({
                               )}
                             </h3>
                             {one.value === null && (
-                              <p className="muted">{one.reason}</p>
+                              <p className="muted">{publicReason(one.reason)}</p>
                             )}
                             <ul className="score-rules">
                               {one.rules
@@ -489,19 +518,19 @@ export default function AccountsObserve({
                                         : `${rule.amount > 0 ? "加" : "减"} ${Math.abs(rule.amount)}`}
                                     </strong>
                                     {"："}
-                                    {rule.because}
+                                    {publicReason(rule.because)}
                                   </li>
                                 ))}
                               {one.rules
                                 .filter((rule) => !rule.fired)
                                 .map((rule) => (
                                   <li key={rule.id} className="muted">
-                                    看过、没触发：{rule.because}
+                                    未达到判断条件：{publicReason(rule.because)}
                                   </li>
                                 ))}
                               {one.skipped.map((rule) => (
                                 <li key={rule.id} className="muted">
-                                  这一次没评：{rule.blocked}
+                                  {explainMissing(rule, featureLabels)}
                                 </li>
                               ))}
                             </ul>
@@ -521,14 +550,8 @@ export default function AccountsObserve({
                       这一块要说清三件事——命中了几条、看过哪些没触发、哪些这一
                       路读取根本查不了。少了第三件，「没标出来」会被读成「没问题」。 */}
                   <Field
-                    label="风险硬标签"
-                    hint={
-                      detail.flags
-                        ? `规则版本 ${detail.flags.rule_version}；`
-                          + `${detail.flags.model_note || "模型层未建"}。`
-                          + "标签绕过分数的门槛：只要证据在场、样本够，标就成立。"
-                        : "这一片的标签由工作室按固定规则打，面板只显示结果。"
-                    }
+                    label="需要人工核实的迹象"
+                    hint="只列出公开资料支持的线索；未发现线索不等于确认账号没有问题。"
                   >
                     {!detail.flags ? (
                       // 和分数一样，06C-2 时代算过的运行没有标签。
@@ -542,19 +565,18 @@ export default function AccountsObserve({
                             {detail.flags.flags.map((one) => (
                               <span key={one.code} className="flag-chip">
                                 <strong>{one.label}</strong>
-                                <small>{one.code}</small>
                               </span>
                             ))}
                           </div>
                         ) : (
                           <p className="muted">
-                            这次一条硬标签都没命中。下面列的是看过哪些、哪些没看。
+                            这次没有发现需要核实的迹象。下面列出已检查和暂时无法判断的项目。
                           </p>
                         )}
                         <ul className="score-rules">
                           {detail.flags.flags.map((one) => (
                             <li key={one.code}>
-                              <strong>{one.label}</strong>（{one.layer}）：{one.evidence}
+                              <strong>{one.label}</strong>（{one.layer}）：{publicReason(one.evidence)}
                             </li>
                           ))}
                           {/* 三句不同的话：看过、没触发 / 这一次没评 / 这条通道查不了。 */}
@@ -562,17 +584,17 @@ export default function AccountsObserve({
                             .filter((one) => !one.fired)
                             .map((one) => (
                               <li key={one.id} className="muted">
-                                看过、没触发：{one.because}
+                                未达到判断条件：{publicReason(one.because)}
                               </li>
                             ))}
                           {detail.flags.skipped.map((one) => (
                             <li key={one.id} className="muted">
-                              这一次没评：{one.blocked}
+                              {explainMissing(one, featureLabels)}
                             </li>
                           ))}
                           {detail.flags.blocked.map((one) => (
                             <li key={one.id} className="muted">
-                              这条通道查不了：{one.blocked}
+                              {explainMissing(one, featureLabels)}
                             </li>
                           ))}
                         </ul>
@@ -604,7 +626,7 @@ export default function AccountsObserve({
                               )}
                             </span>
                             <span className="quality-note">
-                              {feature.known ? "" : feature.note}
+                              {feature.known ? "" : publicReason(feature.note)}
                             </span>
                           </div>
                         ))}

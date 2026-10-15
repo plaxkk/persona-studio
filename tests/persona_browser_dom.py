@@ -5,7 +5,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-HTML = """<meta charset="utf-8"><style>[data-testid=tweetText]{white-space:pre-wrap}</style><nav><a data-testid="AppTabBar_Profile_Link" href="/example">本人</a></nav><main><div data-testid="UserName">示例</div><div data-testid="UserDescription">简介</div>
+HTML = """<meta charset="utf-8"><style>[data-testid=tweetText]{white-space:pre-wrap}</style><nav><a data-testid="AppTabBar_Profile_Link" href="/example">本人</a></nav><main><div data-testid="UserName">示例</div><div data-testid="UserDescription">简介</div><a href="/example/following">1,368 Following</a><a href="/example/verified_followers">48K Followers</a>
 <article data-testid="tweet"><a href="/example/status/90071992547409933"><time datetime="2026-09-23"></time></a><div>Replying to @other</div><div data-testid="tweetText">中文😀\n第二行</div><div data-testid="quoteTweet"><div data-testid="tweetText">他人引用</div></div></article>
 <article data-testid="tweet"><a href="/other/status/90071992547409934"><time></time></a><div data-testid="tweetText">不要计入本人</div></article>
 <article data-testid="tweet"><a href="/example/status/90071992547409935"><time></time></a><div data-testid="tweetText">截断正文</div><button data-testid="tweet-text-show-more-link" onclick="this.previousElementSibling.innerText='完整正文\\n第二行';this.remove()">Show more</button></article>
@@ -47,6 +47,14 @@ async def main():
         await page.add_script_tag(
             content=code + ";window.readPersonaPage=readPersonaPage;"
         )
+
+        profile = await page.evaluate(
+            'async () => readPersonaPage({kind:"account_snapshot",handle:"example"},"example")'
+        )
+        assert profile["state"] == "ready"
+        assert profile["record"]["bio"] == "简介"
+        assert profile["record"]["following"] == 1368
+        assert profile["record"]["followers"] is None  # X abbreviated 48K.
 
         async def act(kind, target=""):
             return await page.evaluate(
