@@ -382,11 +382,26 @@ class CodexEngine(ProcessEngine):
     id = "codex"
 
     def local_config(self):
-        from .codex_persona import preflight
+        from .codex_persona import model_metadata, preflight
         info = preflight()
         if not info["ready"]:
             raise EngineError("codex_not_ready")
-        return {"model": info["model"], "reasoning": info["reasoning"],
+        model, reasoning = info["model"], info["reasoning"]
+        override = self.store.get("codex_writing_model")
+        if override is not None:
+            if not isinstance(override, dict):
+                raise EngineError("codex_not_ready")
+            model, reasoning = override.get("model"), override.get("reasoning")
+            try:
+                supported = {
+                    level["effort"]
+                    for level in model_metadata(model)["models"][0]["supported_reasoning_levels"]
+                }
+            except (OSError, ValueError, KeyError, IndexError, StopIteration, TypeError):
+                raise EngineError("codex_not_ready") from None
+            if not model or reasoning not in supported:
+                raise EngineError("codex_not_ready")
+        return {"model": model, "reasoning": reasoning,
                 "auth": "chatgpt", "revision": uuid.uuid4().hex}
 
     def detect(self):

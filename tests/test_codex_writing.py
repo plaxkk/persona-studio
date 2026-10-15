@@ -60,6 +60,47 @@ def test_login_failure_does_not_select_or_fallback(tmp_path, local_codex):
     assert store.get('engine') == 'hermes'
 
 
+def test_codex_writing_model_can_differ_from_desktop_default(tmp_path, local_codex, monkeypatch):
+    from studio import codex_persona
+
+    store = Store(tmp_path)
+    store.set('codex_writing_model', {'model': 'gpt-6-astra', 'reasoning': 'medium'})
+    checked = []
+
+    def metadata(model):
+        checked.append(model)
+        return {'models': [{'supported_reasoning_levels': [{'effort': 'medium'}]}]}
+
+    monkeypatch.setattr(codex_persona, 'model_metadata', metadata)
+    config = CodexEngine(store).local_config()
+    assert (config['model'], config['reasoning']) == ('gpt-6-astra', 'medium')
+    assert checked == ['gpt-6-astra']
+    assert local_codex['model'] == 'test-model'
+
+
+def test_codex_model_pin_requires_a_new_connection_test(tmp_path, monkeypatch):
+    from deployment import set_codex_writing_model
+
+    monkeypatch.setattr(set_codex_writing_model, 'model_metadata', lambda _: {
+        'models': [{'supported_reasoning_levels': [{'effort': 'medium'}]}]
+    })
+    store = Store(tmp_path)
+    with store.db() as connection:
+        connection.execute("UPDATE engines SET status='ready' WHERE id='codex'")
+
+    with pytest.raises(ValueError, match='推理强度'):
+        set_codex_writing_model.configure(tmp_path, 'gpt-6-astra', 'invalid')
+    assert store.get('codex_writing_model') is None
+
+    backup = set_codex_writing_model.configure(tmp_path, 'gpt-6-astra', 'medium')
+    assert backup.is_file()
+    assert store.get('codex_writing_model') == {'model': 'gpt-6-astra', 'reasoning': 'medium'}
+    assert store.rows("SELECT status FROM engines WHERE id='codex'")[0]['status'] == 'not_verified'
+
+    set_codex_writing_model.configure(tmp_path, None, 'medium')
+    assert store.get('codex_writing_model') is None
+
+
 @pytest.mark.parametrize('bad', [None, 'tool', 'incomplete', 'invalid'])
 def test_codex_output_contract(tmp_path, local_codex, monkeypatch, bad):
     from studio import codex_persona

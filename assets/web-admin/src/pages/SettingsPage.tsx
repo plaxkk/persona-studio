@@ -42,9 +42,8 @@ function EngineCard({
         <Badge>后续接入</Badge>
       </div>
     );
-  // Codex and Claude Code both write on this machine's own CLI login. Neither
-  // takes an API key, and both read their model from that CLI's own settings,
-  // so the card shows what the local tool resolved to instead of a form.
+  // Both use this machine's CLI login. Studio may pin its Codex writing model
+  // independently when the desktop default is unavailable to CLI calls.
   if (engine.id === "codex" || engine.id === "claude") {
     const name = engineName(engine.id);
     return (
@@ -68,7 +67,11 @@ function EngineCard({
             {engine.config.reasoning ? " · " + engine.config.reasoning : ""}
           </p>
         )}
-        <p className="muted">测试连接会同步本机模型设置。调用失败时保留任务错误，不会自动换用其他服务。</p>
+        <p className="muted">
+          {engine.id === "codex" && engine.config.model && engine.config.model !== engine.local_model
+            ? "工作室使用独立的写作模型；测试连接会重新验证它，不会改动本机 Codex 默认模型。"
+            : "测试连接会同步本机模型设置。调用失败时保留任务错误，不会自动换用其他服务。"}
+        </p>
         <div className="actions spaced-small">
           <Button disabled={!engine.installed || !engine.login_ready}
             onClick={() => void actions.run(() => api(`/engines/${engine.id}/verify`, "POST", {}), `已开始 ${name} 真实连接测试`)}>
