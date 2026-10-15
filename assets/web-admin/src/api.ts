@@ -54,7 +54,7 @@ export async function api<T = Record<string, unknown>>(
   });
   const data = await response.json();
   if (!response.ok) {
-    if (response.status === 401)
+    if (response.status === 401 && path !== "/auth/session")
       window.dispatchEvent(new Event("session-expired"));
     throw new Error(
       typeof data.detail === "string"

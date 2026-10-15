@@ -1,6 +1,7 @@
 from __future__ import annotations
 from .sync_status import summary as sync_summary
 import asyncio
+import ipaddress
 import json
 import os
 import re
@@ -247,6 +248,11 @@ def create_app(state_dir=None, public_url=None):
     parsed = urlparse(origin)
     secure = parsed.scheme == "https"
     local = parsed.hostname in ["127.0.0.1", "localhost", "::1", "testserver"]
+    local_passwordless = (
+        local
+        and os.environ.get("STUDIO_HOST", "127.0.0.1") in {"127.0.0.1", "localhost", "::1"}
+        and (root / "local-passwordless").is_file()
+    )
     if not local and not secure:
         raise ValueError("Remote deployment requires STUDIO_PUBLIC_URL=https://...")
     allowed_hosts = {parsed.netloc}
@@ -432,10 +438,26 @@ def create_app(state_dir=None, public_url=None):
     @app.get("/api/v1/auth/status")
     def auth_status():
         return {
-            "initialized": bool(store.get("password_hash")),
+            "initialized": bool(store.get("password_hash")) or local_passwordless,
+            "local_passwordless": local_passwordless,
             "needs_setup_token": not local,
             "brand": store.get("brand"),
         }
+
+    @app.post("/api/v1/auth/local")
+    def local_login(request: Request):
+        try:
+            loopback_client = ipaddress.ip_address(request.client.host).is_loopback
+        except (AttributeError, ValueError):
+            loopback_client = False
+        expected_origin = f"{parsed.scheme}://{request.headers.get('host', '')}"
+        if (
+            not local_passwordless
+            or not loopback_client
+            or request.headers.get("origin") != expected_origin
+        ):
+            fail("本地免密入口只允许本机同源页面使用。", 403)
+        return login_response()
 
     @app.post("/api/v1/auth/setup")
     def setup(body: Login):

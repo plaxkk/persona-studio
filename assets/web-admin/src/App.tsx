@@ -99,6 +99,7 @@ export default function App() {
       try {
         const s = await api<{
           initialized: boolean;
+          local_passwordless: boolean;
           needs_setup_token: boolean;
           brand: string;
         }>("/auth/status");
@@ -113,7 +114,13 @@ export default function App() {
           setCsrf(session.csrf);
           setAuth("ready");
         } catch {
-          setAuth("login");
+          if (s.local_passwordless && !desktopMode) {
+            const session = await api<{ csrf: string }>("/auth/local", "POST");
+            setCsrf(session.csrf);
+            setAuth("ready");
+          } else {
+            setAuth("login");
+          }
         }
       } catch (e) {
         notify((e as Error).message, true);

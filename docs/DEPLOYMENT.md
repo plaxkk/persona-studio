@@ -29,6 +29,8 @@ launchctl kickstart -k gui/$(id -u)/local.persona-studio.worker
 
 Web 创建管理员密码后即可使用，无需管理 token。会话一天过期，HttpOnly / SameSite=Strict，写请求要求 CSRF。所有凭据只接受写入、更换、验证、删除；API 不回显。首次初始化未完成之前，任何能访问本机 loopback 的用户都可能先创建管理员，应在共享机器上及时完成初始化。
 
+本机测试环境可显式开启免密码入口：在私有状态目录创建 `local-passwordless` 标记文件（默认 `.local/state/local-passwordless`，权限 0600），然后只重启 API 服务。只有服务以 loopback 地址监听、页面与请求均来自本机同源时，浏览器才会自动取得普通会话；写请求继续校验 CSRF。在线面板的连接助手仍使用设备授权，远程 HTTPS 服务和非本机请求不会启用此入口。删除标记文件并重启 API 即恢复密码入口；已有本地会话需退出或等待到期。
+
 ## Linux 与远程访问
 
 Linux 使用同一 Python/Node 依赖和 `deployment/install_studio.py --systemd-user`。安装脚本写入用户 systemd units，`UMask=0077`、`NoNewPrivileges=true`、退出自动重启。用户级服务在注销后持续运行需要管理员为该用户启用 linger。Linux 服务模板已实现，当前 macOS 环境不能实机验证 systemd。
