@@ -1613,7 +1613,10 @@ summary {
 
 /* One continuous workspace: capture, conversation, candidate, final. */
 .creation-list { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 16px; }
-.creation-card { text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 12px; color: inherit; min-width: 0; }
+.creation-card { text-align: left; display: flex; flex-direction: column; gap: 12px; color: inherit; min-width: 0; }
+.creation-open { display: flex; flex-direction: column; gap: 12px; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.creation-open:disabled { cursor: default; opacity: .8; }
+.creation-archive { align-self: flex-start; border: 0; background: transparent; color: var(--muted); cursor: pointer; text-decoration: underline; padding: 0; }
 .creation-card strong { white-space: pre-wrap; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .creation-card small { opacity: .65; }
 .creation-grid { display: grid; grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); align-items: start; gap: 24px; }

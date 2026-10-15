@@ -379,14 +379,23 @@ def test_a_claim_that_failed_is_still_recorded(tmp_path):
     assert again["status"] == "already"
 
 
-def test_no_telegram_is_a_different_sentence_from_a_failed_one(tmp_path):
+def test_no_telegram_is_a_different_sentence_from_a_failed_one(tmp_path, monkeypatch):
     """「没配 Telegram」和「发了但失败」不是同一句话。"""
     store = store_for(tmp_path)
+    async def skipped(*_):
+        return "skipped"
+    monkeypatch.setattr(Notifier, "desktop", skipped)
     result = asyncio.run(Notifier(store).send("algorithm:x:3", "上游动了"))
     assert result["telegram"] == "not_configured"
-    # 这一台是 macOS 就有桌面通知；没有的话桌面那一路会说自己跳过了。
-    assert result["desktop"] in ("sent", "failed", "skipped")
-    assert result["status"] in ("sent", "not_configured")
+    assert result["desktop"] == "skipped"
+    assert result["status"] == "not_configured"
+    async def failed(*_):
+        return "failed"
+    monkeypatch.setattr(Notifier, "desktop", failed)
+    result = asyncio.run(Notifier(store).send("algorithm:x:4", "上游动了"))
+    assert result["telegram"] == "not_configured"
+    assert result["desktop"] == "failed"
+    assert result["status"] == "failed"
 
 
 def test_the_desktop_notification_never_interpolates_the_text():

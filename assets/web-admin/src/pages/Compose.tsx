@@ -6,7 +6,7 @@ import type { Studio, Actions, Message } from "../types";
 import { Heading, Field, Button, Empty } from "../components/UI";
 import CreationMedia from "../components/CreationMedia";
 
-type Creation = { id: string; idea: string; candidate: string; stage: string; version: number; draft_id: string | null; final_text?: string; updated: number; messages: Message[]; task: {id: string; status: string; error: string; text: string} | null };
+type Creation = { id: string; idea: string; candidate: string; stage: string; version: number; draft_id: string | null; archived_at: number | null; final_text?: string; updated: number; messages: Message[]; task: {id: string; status: string; error: string; text: string} | null };
 const labels: Record<string, string> = {idea: "灵感暂存", writing: "正在打磨", final: "已定稿"};
 
 export default function Compose({data, actions}: {data: Studio; actions: Actions}) {
@@ -16,6 +16,7 @@ export default function Compose({data, actions}: {data: Studio; actions: Actions
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState("all");
+  const [changing, setChanging] = useState("");
   async function refresh() { setItems(await api<Creation[]>("/creations")); setLoaded(true); }
   useEffect(() => { void refresh().catch(e => actions.notify(e.message, true)); }, []);
   function select(id: string) { setSelected(id); sessionStorage.setItem("creation-selected", id); }
@@ -28,8 +29,17 @@ export default function Compose({data, actions}: {data: Studio; actions: Actions
       if (open) select(record.id); else actions.notify("灵感已暂存，随时可以继续创作");
     } catch(e) { actions.notify((e as Error).message, true); } finally { setBusy(false); }
   }
+  async function setArchived(item: Creation, archived: boolean) {
+    setChanging(item.id);
+    try {
+      await api(`/creations/${item.id}`, "PUT", {version:item.version, idea:item.idea, candidate:item.candidate, archived});
+      await refresh();
+      actions.notify(archived ? "已归档，可在已归档中恢复" : "已恢复到创作列表");
+    } catch(e) { actions.notify((e as Error).message, true); } finally { setChanging(""); }
+  }
   if (selected) return <Workspace key={selected} id={selected} data={data} actions={actions} back={async () => { await flushDrafts(); select(""); await refresh(); }} />;
-  const visible = items.filter(i => filter === "all" || i.stage === filter);
+  const active = items.filter(i => !i.archived_at);
+  const visible = filter === "archived" ? items.filter(i => !!i.archived_at) : active.filter(i => filter === "all" || i.stage === filter);
   const linked = new Set(items.map(i => i.draft_id));
   const legacy = data.drafts.filter(d => d.kind === "post" && d.status === "draft" && !linked.has(d.id));
   return <>
@@ -40,10 +50,10 @@ export default function Compose({data, actions}: {data: Studio; actions: Actions
       <div className="actions"><Button busy={busy} disabled={!idea.trim()} onClick={() => void capture(false)}><Save size={16}/>仅暂存灵感</Button><Button tone="primary" busy={busy} disabled={!idea.trim()} onClick={() => void capture(true)}><MessageCircle size={16}/>保存并开始创作</Button></div>
       <p className="muted">暂存不调用 AI。进入创作后，可以先脑暴，也可以直接写候选稿。</p>
     </section>
-    <div className="section-title spaced"><h2>我的创作</h2><span className="muted">{items.length} 份记录</span></div>
-    <div className="tabs">{[["all","全部"],["idea","灵感暂存"],["writing","正在打磨"],["final","已定稿"]].map(([v,t]) => <button key={v} className={filter===v?"active":""} onClick={()=>setFilter(v)}>{t}</button>)}</div>
-    <div className="creation-list">{visible.map(i => <button key={i.id} className="surface creation-card" onClick={()=>select(i.id)}><span className="eyebrow">{labels[i.stage]}</span><strong>{i.idea}</strong><small>{time(i.updated)} · {i.stage === "final" ? "查看定稿" : "继续创作"} →</small></button>)}</div>
-    {loaded && !visible.length && <section className="surface"><Empty title="把第一条灵感放在这里" description="不用一开始就写成推文。记下事实、疑问或半句话，之后再一起展开。" /></section>}
+    <div className="section-title spaced"><h2>我的创作</h2><span className="muted">{active.length} 份记录</span></div>
+    <div className="tabs">{[["all","全部"],["idea","灵感暂存"],["writing","正在打磨"],["final","已定稿"],["archived","已归档"]].map(([v,t]) => <button key={v} className={filter===v?"active":""} onClick={()=>setFilter(v)}>{t}</button>)}</div>
+    <div className="creation-list">{visible.map(i => <div key={i.id} className="surface creation-card"><button className="creation-open" onClick={()=>select(i.id)} disabled={!!i.archived_at}><span className="eyebrow">{i.archived_at ? "已归档" : labels[i.stage]}</span><strong>{i.idea}</strong><small>{time(i.updated)} · {i.archived_at ? "可恢复" : i.stage === "final" ? "查看定稿" : "继续创作"}</small></button><button className="creation-archive" disabled={changing===i.id} onClick={()=>void setArchived(i, !i.archived_at)}>{i.archived_at ? "恢复" : "归档"}</button></div>)}</div>
+    {loaded && !visible.length && <section className="surface"><Empty title={filter === "archived" ? "暂无归档记录" : "把第一条灵感放在这里"} description={filter === "archived" ? "暂时没有归档的灵感。" : "不用一开始就写成推文。记下事实、疑问或半句话，之后再一起展开。"} /></section>}
     {!!legacy.length && <section className="surface spaced"><p>还有 {legacy.length} 份此前保存的原创草稿。</p><Button onClick={()=>actions.navigate("history")}>到内容库继续处理</Button></section>}
   </>;
 }

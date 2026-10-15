@@ -83,6 +83,20 @@ with tempfile.TemporaryDirectory(prefix='creation-ui-') as tmp:
             page.get_by_label('再次输入密码', exact=True).fill('creation-ui-password')
             page.get_by_role('button', name='创建工作室', exact=True).click()
             page.get_by_role('button', name='写推文', exact=True).click()
+            fixture = '验收：临时测试灵感'
+            page.get_by_label('灵感、观察或工作片段').fill(fixture)
+            page.get_by_role('button', name='仅暂存灵感', exact=True).click()
+            fixture_card = page.locator('.creation-card').filter(has_text=fixture)
+            expect(fixture_card).to_be_visible()
+            fixture_card.get_by_role('button', name='归档', exact=True).click()
+            expect(fixture_card).to_have_count(0)
+            page.get_by_role('button', name='已归档', exact=True).click()
+            archived_card = page.locator('.creation-card').filter(has_text=fixture)
+            expect(archived_card).to_be_visible()
+            archived_card.get_by_role('button', name='恢复', exact=True).click()
+            expect(archived_card).to_have_count(0)
+            page.get_by_role('button', name='全部', exact=True).click()
+            expect(page.locator('.creation-card').filter(has_text=fixture)).to_be_visible()
             idea = '今天给提醒工具加上失败重试'
             page.get_by_label('灵感、观察或工作片段').fill(idea)
             page.get_by_role('button', name='仅暂存灵感', exact=True).click()
@@ -91,7 +105,7 @@ with tempfile.TemporaryDirectory(prefix='creation-ui-') as tmp:
             assert not engine.requests
             page.reload()
             page.get_by_role('button', name='写推文', exact=True).click()
-            page.locator('.creation-card').filter(has_text=idea).click()
+            page.locator('.creation-card').filter(has_text=idea).locator('.creation-open').click()
             page.get_by_role('button', name='帮我找三个角度', exact=True).click()
             expect(page.locator('.creation-message.assistant')).to_have_count(1, timeout=15000)
             prompt = page.get_by_label('继续讨论或提出修改意见')
@@ -104,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix='creation-ui-') as tmp:
             manual = '我手动补充：遇到的是网络超时，不能保证每次成功。'
             candidate.fill(manual)
             expect(page.locator('.creation-preview small')).to_contain_text('已保存', timeout=10000)
-            assert app.state.store.rows('SELECT candidate FROM creations')[0]['candidate'] == manual
+            assert app.state.store.rows('SELECT candidate FROM creations WHERE idea=?', (idea,))[0]['candidate'] == manual
             page.get_by_role('button', name='内容库', exact=True).click()
             page.get_by_role('button', name='写推文', exact=True).click()
             expect(page.get_by_label('推文正文', exact=True)).to_have_value(manual)
@@ -146,7 +160,7 @@ with tempfile.TemporaryDirectory(prefix='creation-ui-') as tmp:
             expect(page.get_by_label('草稿正文', exact=True)).to_have_count(0)
             assert not errors, errors
             browser.close()
-            print('PASS capture without AI, reload/resume, multiple turns, candidate editing, failure/retry, context continuity, explicit finalization, content-library handoff and current final preview; desktop/mobile; no page errors')
+            print('PASS archive/restore, capture without AI, reload/resume, multiple turns, candidate editing, failure/retry, context continuity, explicit finalization, content-library handoff and current final preview; desktop/mobile; no page errors')
     finally:
         server.should_exit = True
         thread.join(timeout=5)

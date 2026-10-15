@@ -583,6 +583,11 @@ class Store:
                     c.execute("INSERT OR IGNORE INTO settings VALUES(?,?)",
                               (key, json.dumps(value)))
                 c.execute("INSERT INTO migrations VALUES(13,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=14").fetchone():
+                # Keep abandoned ideas and acceptance fixtures recoverable without
+                # letting them crowd the active writing queue.
+                c.execute("ALTER TABLE creations ADD COLUMN archived_at INTEGER")
+                c.execute("INSERT INTO migrations VALUES(14,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

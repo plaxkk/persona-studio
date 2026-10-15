@@ -16,6 +16,7 @@ class Revision(BaseModel):
     version: int = Field(ge=1)
     idea: str = Field(min_length=1, max_length=12000)
     candidate: str = Field(default="", max_length=12000)
+    archived: bool | None = None
 
 
 class Turn(BaseModel):
@@ -47,12 +48,14 @@ def register(app, store, jobs, session, vault):
         if not store.rows('SELECT id FROM creations WHERE id=?', (ident,)):
             raise HTTPException(404, '创作记录不存在')
 
-    def editable(c, ident, version):
+    def editable(c, ident, version, allow_final=False, allow_archived=False):
         row = c.execute('SELECT * FROM creations WHERE id=?', (ident,)).fetchone()
         if not row:
             raise HTTPException(404, '创作记录不存在')
-        if row['version'] != version or row['draft_id']:
+        if row['version'] != version or (row['draft_id'] and not allow_final):
             raise HTTPException(409, '内容已变化，请重新打开最新记录。')
+        if row['archived_at'] and not allow_archived:
+            raise HTTPException(409, '这条灵感已归档，请先恢复。')
         if row['task_id'] and c.execute("SELECT 1 FROM tasks WHERE id=? AND status IN ('queued','running')", (row['task_id'],)).fetchone():
             raise HTTPException(409, 'AI 正在回应，请等待或停止后再修改。')
         return row
@@ -68,6 +71,11 @@ def register(app, store, jobs, session, vault):
             raise HTTPException(422, '先记下一点想法。')
         ident, now = uuid.uuid4().hex, int(time.time())
         with store.db(True) as c:
+            # An identical, still-unwritten idea is one work item. Keep its ID
+            # so a double submit does not leave a second card in the queue.
+            existing = c.execute("SELECT id FROM creations WHERE idea=? AND stage='idea' AND archived_at IS NULL ORDER BY created DESC LIMIT 1", (idea,)).fetchone()
+            if existing:
+                return {'id': existing['id']}
             c.execute('INSERT INTO creations(id,idea,created,updated) VALUES(?,?,?,?)', (ident, idea, now, now))
         return {'id': ident}
 
@@ -98,8 +106,13 @@ def register(app, store, jobs, session, vault):
         if not idea:
             raise HTTPException(422, '灵感内容不能为空。')
         with store.db(True) as c:
-            editable(c, ident, body.version)
-            c.execute("UPDATE creations SET idea=?,candidate=?,stage=CASE WHEN ?<>'' THEN 'writing' ELSE stage END,version=version+1,updated=? WHERE id=?", (idea, candidate, candidate, int(time.time()), ident))
+            row = editable(c, ident, body.version, allow_final=body.archived is not None,
+                           allow_archived=body.archived is False)
+            if row['draft_id'] and (idea != row['idea'] or candidate != row['candidate']):
+                raise HTTPException(409, '已定稿的正文请到内容库修改。')
+            now = int(time.time())
+            archived_at = row['archived_at'] if body.archived is None else (now if body.archived else None)
+            c.execute("UPDATE creations SET idea=?,candidate=?,stage=CASE WHEN draft_id IS NOT NULL THEN stage WHEN ?<>'' THEN 'writing' ELSE stage END,archived_at=?,version=version+1,updated=? WHERE id=?", (idea, candidate, candidate, archived_at, now, ident))
         return detail(ident)
 
     @app.post('/api/v1/creations/{ident}/turn', dependencies=[Depends(session)])
@@ -107,6 +120,8 @@ def register(app, store, jobs, session, vault):
         text = sanitize(body.text, vault.all().values()).strip()
         if not text:
             raise HTTPException(422, '请输入想讨论或修改的内容。')
+        if not store.rows('SELECT id FROM creations WHERE id=? AND archived_at IS NULL', (ident,)):
+            raise HTTPException(409, '这条灵感已归档，请先恢复。')
         # enqueue checks the revision and reserves this conversation in one transaction.
         task = jobs.enqueue('chat', {'creation_id': ident, 'expected_version': body.version,
             'mode': body.mode, 'text': text, 'channel': 'creation:' + ident})

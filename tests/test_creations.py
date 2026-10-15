@@ -105,3 +105,42 @@ def test_manual_writing_stage_and_latest_final_preview(workspace):
     assert draft['creation_id'] == ident
     c.put('/api/v1/drafts/'+draft_id, json={'text':'内容库最新正文','version':draft['version']})
     assert c.get(path).json()['final_text'] == '内容库最新正文'
+
+
+def test_duplicate_capture_and_recoverable_archive(workspace):
+    c, store, jobs, engine = workspace
+    path = '/api/v1/creations'
+    first = c.post(path, json={'idea':'  同一条灵感  '}).json()['id']
+    assert c.post(path, json={'idea':'同一条灵感'}).json()['id'] == first
+    assert len(c.get(path).json()) == 1
+    item = c.get(path+'/'+first).json()
+    archived = c.put(path+'/'+first, json={
+        'version':item['version'], 'idea':item['idea'], 'candidate':'', 'archived':True,
+    }).json()
+    assert archived['archived_at'] and archived['stage'] == 'idea'
+    assert c.post(path+'/'+first+'/turn', json={'version':archived['version'], 'text':'继续'}).status_code == 409
+    assert c.put(path+'/'+first, json={'version':archived['version'], 'idea':'擅自改动'}).status_code == 409
+    second = c.post(path, json={'idea':'同一条灵感'}).json()['id']
+    assert second != first
+    restored = c.put(path+'/'+first, json={
+        'version':archived['version'], 'idea':archived['idea'],
+        'candidate':archived['candidate'], 'archived':False,
+    }).json()
+    assert restored['archived_at'] is None
+    assert c.get(path+'/'+first).json()['idea'] == '同一条灵感'
+    assert store.rows('SELECT version FROM migrations WHERE version=14')
+
+
+def test_final_creation_can_be_archived_without_changing_final_draft(workspace):
+    c, store, jobs, engine = workspace
+    ident = c.post('/api/v1/creations', json={'idea':'要写的事'}).json()['id']
+    path = '/api/v1/creations/' + ident
+    edited = c.put(path, json={'version':1, 'idea':'要写的事', 'candidate':'正式内容'}).json()
+    draft_id = c.post(path+'/finalize', json={'version':edited['version']}).json()['draft_id']
+    final = c.get(path).json()
+    archived = c.put(path, json={'version':final['version'], 'idea':final['idea'],
+                                  'candidate':final['candidate'], 'archived':True}).json()
+    assert archived['stage'] == 'final' and archived['draft_id'] == draft_id
+    assert c.put(path, json={'version':archived['version'], 'idea':'要写的事',
+                             'candidate':'换掉正文', 'archived':False}).status_code == 409
+    assert store.rows('SELECT text FROM drafts WHERE id=?', (draft_id,))[0]['text'] == '正式内容'
