@@ -1134,7 +1134,7 @@
       "group": "multipliers",
       "id": "vm-ranker/params.rs::AuthorDiversityFloor",
       "name": "作者多样性折扣下限",
-      "note": "floor = 0.25 表示打折有下限：同作者第 1 条是 0.75×，第 2 条 0.625×，一路逼近但不会低于 0.25×。",
+      "note": "floor = 0.25 表示折扣有下限：同一轮候选中同作者第 1 条为 1×，第 2 条 0.625×，第 3 条 0.4375×，之后趋近 0.25×。",
       "official": "rust_home_mixer_author_diversity_floor",
       "order": 7,
       "source": {

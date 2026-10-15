@@ -182,14 +182,9 @@ export default function AlgorithmLogChanges({
   return (
     <>
       <Heading
-        eyebrow="06D 算法更新跟踪"
-        title="上游动了什么，记在本机"
-        description={
-          "盯的是 X 官方开源的那份 For You 算法。这里只回答三件事：上游动没动、" +
-          "本机从文件清单里算出来的「改了什么」、以及这次改动对我们意味着什么。" +
-          "第三件事分两半写——一半是引擎读出来的，一半是人给的判断，它们不会互相覆盖。" +
-          "上游可能几周都不动；不动就写「暂无数据」，不编事件。"
-        }
+        eyebrow="算法更新 · 运营版"
+        title="这次变化，要不要调整做法？"
+        description="先分清源码改动和线上影响，再决定是否调整内容与发布节奏。"
         action={
           <Badge tone={ledger?.watching ? "green" : ""}>
             {ledger?.watching ? "自动盯着" : "没在自动盯"}
@@ -197,6 +192,16 @@ export default function AlgorithmLogChanges({
         }
       />
       {active && tabs}
+      <section className="surface algorithm-update-brief" aria-label="运营视角的更新判断">
+        <p className="algorithm-kicker">每条更新先回答四个问题</p>
+        <div className="algorithm-update-grid">
+          <div><small>01 · 源码事实</small><strong>确定变了什么</strong><p>{detail ? detail.summary : events.length ? "正在读取选中的提交。" : state?.last_checked ? "从记录起点以来，暂无已记录的上游改动。" : "尚未成功核对上游。"}</p></div>
+          <div><small>02 · 运营推论</small><strong>可能影响哪一环</strong><p>{detail ? detail.modules_json.some((one) => one.module !== "other") ? "涉及候选或排序相关目录；具体规则和线上是否启用，仍需读代码与配置。" : "当前文件清单不足以证明推荐规则发生变化。" : "没有可评估的改动，暂不能判断流量影响。"}</p></div>
+          <div><small>03 · 运营动作</small><strong>现在要不要改</strong><p>{detail?.impact_at ? `已记录判断：${word(detail.proposal_status)}。下方可查看理由。` : "先核对源码和自己的数据，再决定；不因一次提交立刻改变发帖频次。"}</p></div>
+          <div><small>04 · 待验证</small><strong>怎样知道有影响</strong><p>确认改动在线生效后，比较相近主题帖子在相同观察窗口内的展示、互动、主页访问与粉丝净增；缺失项保留未知。</p></div>
+        </div>
+        {detail?.url && <a href={detail.url} target="_blank" rel="noopener noreferrer">查看原始提交 ↗</a>}
+      </section>
       <div className="stack">
         <section className="surface">
           <div className="section-title">
