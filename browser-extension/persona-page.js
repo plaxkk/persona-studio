@@ -67,6 +67,9 @@ export async function readPersonaPage(action, expected) {
         url: primary.querySelector('[data-testid="UserUrl"]')?.innerText || "",
         joined: primary.querySelector('[data-testid="UserJoinDate"]')?.innerText || "",
         followers: count(followersLink, "Followers|粉丝"),
+        // Keep X's displayed abbreviation alongside the unknown exact count.
+        // "48K" is useful context, but must never become a fabricated 48,000.
+        followers_display: followersLink.innerText.trim(),
         following: count(link("following"), "Following|正在关注|关注"),
         // The header carries no post total. Reporting the field as absent, with
         // why, keeps it from being read later as "this account has 0 posts".

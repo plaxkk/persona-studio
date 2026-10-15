@@ -55,6 +55,7 @@ async def main():
         assert profile["record"]["bio"] == "简介"
         assert profile["record"]["following"] == 1368
         assert profile["record"]["followers"] is None  # X abbreviated 48K.
+        assert profile["record"]["followers_display"] == "48K Followers"
 
         async def act(kind, target=""):
             return await page.evaluate(

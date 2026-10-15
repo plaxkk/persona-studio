@@ -39,14 +39,37 @@ async function inMain(tabId, func) {
 }
 
 async function waitForLoad(tabId) {
+  let promoted = false;
   for (let attempt = 0; attempt < LOAD_ATTEMPTS; attempt++) {
     const current = await chrome.tabs.get(tabId);
     if (current.status === "complete") {
       if (current.url?.startsWith("https://x.com/i/flow/login"))
         return { state: "waiting_login" };
       if (!current.url?.startsWith(SEARCH_PREFIX)) return { state: "source_error" };
-      return { state: "ready" };
+      return { state: "ready", promoted };
     }
+    // X sometimes leaves a background search tab loading indefinitely. The
+    // collector already raises a stalled tab later; do the same before the
+    // first response, or a valid search is discarded as an empty account.
+    if (attempt === 7) {
+      promoted = true;
+      await chrome.tabs.update(tabId, { active: true }).catch(() => {});
+    }
+    await delay(500);
+  }
+  return { state: "waiting_browser" };
+}
+
+async function waitForIdentity(tabId, account) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      const identity = await chrome.scripting.executeScript({
+        target: { tabId }, world: "ISOLATED",
+        func: readPersonaPage, args: [{ kind: "identity" }, account],
+      });
+      const status = identity[0]?.result || { state: "waiting_browser" };
+      if (status.state !== "waiting_browser") return status;
+    } catch { /* The document may still be replaced after tabs.status=complete. */ }
     await delay(500);
   }
   return { state: "waiting_browser" };
@@ -155,17 +178,13 @@ async function readSearch(url, account, limit) {
     tab = await chrome.tabs.create({ url, active: false });
     const loaded = await waitForLoad(tab.id);
     if (loaded.state !== "ready") return loaded;
-    const identity = await chrome.scripting.executeScript({
-      target: { tabId: tab.id }, world: "ISOLATED",
-      func: readPersonaPage, args: [{ kind: "identity" }, account],
-    });
-    const status = identity[0]?.result || { state: "waiting_browser" };
+    const status = await waitForIdentity(tab.id, account);
     if (status.state !== "ready") return status;
     const read = await harvest(tab.id, limit);
     if (!read.pages.length) return { state: "source_error" };
     return {
       state: "ready", account, stopped_reason: read.reason,
-      promoted: read.promoted, pages: read.pages,
+      promoted: loaded.promoted || read.promoted, pages: read.pages,
     };
   } catch {
     return { state: "waiting_browser" };

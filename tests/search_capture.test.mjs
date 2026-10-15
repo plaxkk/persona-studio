@@ -139,19 +139,20 @@ const captured = (count, { cursor = 'C1', bytes = 20_000, query = QUERY } = {}) 
 });
 
 function install({ pages = [], identity = { state: 'ready', account: 'kkplayit' },
-  counts = null, tabUrl = SEARCH } = {}) {
+  counts = null, tabUrl = SEARCH, loadingRounds = 0 } = {}) {
   const opened = [], removed = [], updates = [];
-  let index = 0;
+  let index = 0, identityIndex = 0, loadIndex = 0;
+  const identities = Array.isArray(identity) ? identity : [identity];
   globalThis.chrome = {
     tabs: {
       create: async ({ url }) => { opened.push(url); return { id: 7 }; },
-      get: async () => ({ status: 'complete', url: tabUrl }),
+      get: async () => ({ status: loadIndex++ < loadingRounds ? 'loading' : 'complete', url: tabUrl }),
       update: async (id, props) => { updates.push(props); },
       remove: async (id) => { removed.push(id); },
     },
     scripting: { executeScript: async (options) => {
       if (options.world === 'ISOLATED')
-        return [{ result: options.args ? identity : true }];
+        return [{ result: options.args ? identities[Math.min(identityIndex++, identities.length - 1)] : true }];
       if (String(options.func).includes('Counts')) return [{ result: counts }];
       return [{ result: index < pages.length ? pages[index++] : null }];
     } },
@@ -212,6 +213,16 @@ test('a read that had to raise the tab says so', async () => {
   assert.equal(read.promoted, true);
   assert.deepEqual(updates, [{ active: true }]);
   assert.equal(read.stopped_reason, 'exhausted');
+});
+
+test('a background search that stalls is raised and a late identity is retried', async () => {
+  const { updates } = install({ loadingRounds: 9,
+    identity: [{ state: 'waiting_browser' }, { state: 'ready', account: 'kkplayit' }],
+    pages: [captured(1), captured(0)] });
+  const read = await operateSearch(action());
+  assert.equal(read.state, 'ready');
+  assert.equal(read.promoted, true);
+  assert.deepEqual(updates, [{ active: true }]);
 });
 
 test('a login wall or a wrong page is reported instead of read', async () => {

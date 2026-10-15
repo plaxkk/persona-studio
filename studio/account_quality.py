@@ -456,9 +456,12 @@ def _profile_features(profile: list[dict], exact_created_at: int | None = None) 
     following = extra.get("following")
     followers = followers if isinstance(followers, int) and followers >= 0 else None
     following = following if isinstance(following, int) and following >= 0 else None
+    displayed = str(extra.get("followers_display") or "").split(" ")[0].strip()
+    missing_followers = (f"X 主页显示 {displayed}，没有提供准确粉丝数"
+                         if displayed else "X 主页使用缩写，读不出准确粉丝数")
     rows = [
         _feature("followers", "粉丝数", layer, "人", followers,
-                 "" if followers is not None else "主页上写成了 1.2K 这样的缩写，读不出准确数"),
+                 "" if followers is not None else missing_followers),
         _feature("following", "关注数", layer, "人", following,
                  "" if following is not None else "主页没有给出可读的关注数"),
         _feature("follower_following_ratio", "粉丝/关注比", layer, "",
