@@ -93,14 +93,35 @@ export async function operateGrowthFollowers(action) {
   try {
     previous = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     const path = `/${account}/followers`;
+    const found = new Map();
+    // X may populate an already-open followers page while a new tab still has
+    // an empty timeline. Read that page without navigating or scrolling it.
+    const existingTabs = (await chrome.tabs.query({})).filter((candidate) => {
+      try { return new URL(candidate.url).origin === "https://x.com" &&
+        new URL(candidate.url).pathname === path; }
+      catch { return false; }
+    });
+    for (const existing of existingTabs) {
+      if (!existing.id) continue;
+      const identity = await chrome.scripting.executeScript({ target: { tabId: existing.id }, world: "ISOLATED",
+        func: readPersonaPage, args: [{ kind: "identity" }, account] }).catch(() => []);
+      if (identity[0]?.result?.state === "ready") {
+        const visible = await chrome.scripting.executeScript({ target: { tabId: existing.id }, world: "ISOLATED",
+          func: readFollowerCards }).catch(() => []);
+        if (visible[0]?.result?.state === "ready") {
+          for (const item of visible[0].result.handles || []) found.set(item.handle.toLowerCase(), item);
+          if (found.size) break;
+        }
+      }
+    }
     const opened = await openAccountTab(account, `https://x.com${path}`, path, true);
     tab = opened.tab;
     if (opened.error) return { state: opened.error, hint: opened.hint || "open" };
-    const found = new Map();
     let stalled = 0;
     let empty = false;
     let lastHint = "no_cards";
-    for (let n = 0; n < 15 && found.size < 180; n++) {
+    const usedExisting = found.size > 0;
+    for (let n = 0; n < 45 && found.size < 180 && !usedExisting; n++) {
       const read = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "ISOLATED",
         func: readFollowerCards });
       const result = read[0]?.result || { state: "waiting_browser" };

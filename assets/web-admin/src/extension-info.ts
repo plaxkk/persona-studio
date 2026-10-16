@@ -1,4 +1,4 @@
-export const EXTENSION_VERSION = "1.4.6";
+export const EXTENSION_VERSION = "1.4.7";
 export const EXTENSION_DOWNLOAD = "/downloads/persona-studio-browser.zip";
 export function extensionNeedsUpdate(version?: string) {
   if (!version || !/^\d+\.\d+\.\d+$/.test(version)) return true;

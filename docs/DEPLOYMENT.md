@@ -1,5 +1,7 @@
 # 人格工作室部署与迁移
 
+x-auto / Persona Studio 的 Supabase 项目 ref 为 `shkydawpsfdmcdkovnmu`。`nestful` 属于另一项目；应用成长快照迁移前必须核对目标项目 ref，不得在 `nestful` 执行。
+
 ## 当前部署
 
 本机 macOS 使用 launchd，API 监听 `127.0.0.1:18880`，另一个 worker 执行读取和模型任务。无需 Docker 或额外数据库。旧 `local.x-persona.admin/hermes/shadow` 服务已停止，其 plist 移到 `.local/state/backups/services-*`。新的服务为 `local.persona-studio.api` 和 `local.persona-studio.worker`。
