@@ -74,7 +74,7 @@ def register(app, store, jobs, session):
     @app.post("/api/v1/growth/rewards/read", dependencies=[Depends(session)])
     def read_rewards():
         account()
-        if not BrowserReads(store).connected((1, 4, 6)):
+        if not BrowserReads(store).connected((1, 4, 7)):
             raise HTTPException(409, "请将连接助手更新到 1.4.7 并连接本机。")
         try:
             return {"task_id": jobs.enqueue("growth_rewards", {}, dedupe="growth-rewards")}
@@ -84,7 +84,7 @@ def register(app, store, jobs, session):
     @app.post("/api/v1/growth/followers/read", dependencies=[Depends(session)])
     def read_followers():
         account()
-        if not BrowserReads(store).connected((1, 4, 6)):
+        if not BrowserReads(store).connected((1, 4, 7)):
             raise HTTPException(409, "请将连接助手更新到 1.4.7 并连接本机。")
         try:
             return {"task_id": jobs.enqueue("growth_followers", {}, dedupe="growth-followers")}
