@@ -6,8 +6,8 @@ import { EXTENSION_VERSION, extensionNeedsUpdate, isUpgradeRelatedRoute } from '
 test('website version tracks extension package and handles legacy versions',()=>{
  const manifest=JSON.parse(fs.readFileSync(new URL('../browser-extension/manifest.json',import.meta.url)));
  assert.equal(EXTENSION_VERSION,manifest.version);
- for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','1.3.14','1.4.0','invalid']) assert.equal(extensionNeedsUpdate(value),true);
- for(const value of ['1.4.1','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
+ for(const value of [undefined,'1.2.0','1.3.1','1.3.2','1.3.3','1.3.7','1.3.8','1.3.9','1.3.10','1.3.11','1.3.13','1.3.14','1.4.0','1.4.1','1.4.3','1.4.4','invalid']) assert.equal(extensionNeedsUpdate(value),true);
+ for(const value of ['1.4.5','2.0.0']) assert.equal(extensionNeedsUpdate(value),false);
 });
 test('Codex and Claude Code verification and selection allowed, credential writes still denied',()=>{
  for(const engine of ['codex','claude']) {
@@ -73,6 +73,11 @@ test('growth and publication metrics routes stay scoped to the local bridge',()=
  const id='a'.repeat(32);
  for(const [path,method] of [
   ['/growth','GET'],['/growth/goal','PUT'],['/growth/read','POST'],
+  ['/growth/plan','GET'],['/growth/weeks/suggest','POST'],['/growth/weeks/'+id,'PUT'],
+  ['/growth/milestones/1','PUT'],['/growth/checkins','POST'],
+  ['/growth/experiments','POST'],['/growth/experiments/'+id,'PUT'],
+  ['/growth/rewards/read','POST'],['/growth/followers/read','POST'],
+  ['/growth/relationships/lifesinger','PUT'],
   ['/drafts/'+id+'/metrics','GET'],['/drafts/'+id+'/metrics/read','POST']
  ]) { assert.equal(allowedRoute(path,method),true); assert.equal(isUpgradeRelatedRoute(path),true); }
  assert.equal(allowedRoute('/growth/goal','GET'),false);

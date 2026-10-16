@@ -10,7 +10,8 @@ import { useEffect, useState } from "react";
 import { api, label, time } from "../api";
 import type { Studio, Actions } from "../types";
 import { Heading, Button, Badge, Step, Empty } from "../components/UI";
-type Growth = { goal: { target_followers: number } | null; profile: { followers: number | null; observed_at: number; bio: string | null; pinned_tweet_id: string | null } | null; remaining: number | null };
+type Growth = { profile: { followers: number | null; observed_at: number; stale: boolean } | null;
+  milestones: { id: number; target: number; remaining: number | null }[]; current_milestone_id: number | null };
 type AnalyticsContent = {
   browser_ready: boolean;
   history_ready: boolean;
@@ -41,9 +42,8 @@ export default function Home({
   const [analyticsOverview, setAnalyticsOverview] = useState<AnalyticsOverview | null>(null);
   const [historyFrom, setHistoryFrom] = useState("");
   const [historyTo, setHistoryTo] = useState("");
-  const [target, setTarget] = useState(1000);
   useEffect(() => {
-    api<Growth>("/growth").then((value) => { setGrowth(value); setTarget(value.goal?.target_followers || 1000); }).catch(() => setGrowth(null));
+    api<Growth>("/growth/plan").then(setGrowth).catch(() => setGrowth(null));
     api<AnalyticsContent>("/analytics/content").then(setAnalytics).catch(() => setAnalytics(null));
     api<AnalyticsOverview>("/analytics/overview").then(setAnalyticsOverview).catch(() => setAnalyticsOverview(null));
   }, [s.x_username, o.events[0]?.id]);
@@ -129,13 +129,12 @@ export default function Home({
       </div>
       <section className="surface spaced">
         <div className="section-title"><h2>涨粉目标</h2><Badge>{growth?.profile?.followers == null ? "粉丝数待读取" : `${growth.profile.followers} 位粉丝`}</Badge></div>
-        <p>最近一次账号读取：{growth?.profile ? time(growth.profile.observed_at) : "暂无数据"}。目标剩余：{growth?.remaining ?? "暂无数据"}。</p>
+        <p>最近一次账号读取：{growth?.profile ? time(growth.profile.observed_at) : "暂无数据"}{growth?.profile?.stale ? "（已过期）" : ""}。当前阶段：{growth?.milestones.find((item) => item.id === growth.current_milestone_id)?.target ?? "暂无数据"} 粉；目标剩余：{growth?.milestones.find((item) => item.id === growth.current_milestone_id)?.remaining ?? "暂无数据"}。</p>
         <div className="draft-tools">
-          <label>目标粉丝数 <input type="number" min="1" max="100000000" value={target} onChange={(e) => setTarget(Number(e.target.value))} /></label>
-          <Button onClick={() => void actions.run(async () => { const value = await api<Growth>("/growth/goal", "PUT", { target_followers: target }); setGrowth(value); return value; }, "涨粉目标已保存")}>保存目标</Button>
           <Button onClick={() => void actions.run(() => api("/growth/read", "POST", {}), "已加入账号读取队列")}>读取粉丝数与主页</Button>
         </div>
         {growth?.profile && <small>主页介绍与置顶记录在本机每日快照中；无法读到精确粉丝数时显示“暂无数据”。</small>}
+        <Button onClick={() => actions.navigate("growth")}>打开成长计划 →</Button>
       </section>
       <section className="surface spaced">
         <div className="section-title"><h2>Subscription 帖子数据</h2><Badge>{analytics?.browser_ready ? "可读取" : "等连接助手更新"}</Badge></div>

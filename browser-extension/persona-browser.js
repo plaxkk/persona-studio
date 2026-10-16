@@ -2,6 +2,7 @@ import { readPersonaPage } from "./persona-page.js";
 import { operateSync } from "./sync-browser.js";
 import { operateAnalyticsContent, operateAnalyticsOverview } from "./analytics-browser.js";
 import { operateSearch } from "./search-browser.js";
+import { operateGrowthRewards, operateGrowthFollowers } from "./growth-browser.js";
 import { encodeResultFrames } from "./result-chunks.js";
 let socket,
   connecting = false;
@@ -10,6 +11,8 @@ export async function operate(action) {
   if (action.kind === "analytics_content_read") return operateAnalyticsContent(action);
   if (action.kind === "analytics_overview_read") return operateAnalyticsOverview(action);
   if (action.kind === "search_read") return operateSearch(action);
+  if (action.kind === "growth_rewards_read") return operateGrowthRewards(action);
+  if (action.kind === "growth_followers_read") return operateGrowthFollowers(action);
   if (["sync_read", "context_read", "metric_read", "profile_read", "account_read"].includes(action.kind)) return operateSync(action);
   const key = "persona-task-" + action.import_id;
   let saved = (await chrome.storage.session.get(key))[key];

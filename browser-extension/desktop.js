@@ -11,6 +11,9 @@ export function allowedRoute(path, method) {
     if ([...params].some(([key, value]) => !["view", "topic", "q", "offset", "limit"].includes(key) || value.length > 120) ||
         [...params.keys()].length !== new Set(params.keys()).size) return false;
   }
+  if (method === "GET" && pathname === "/growth/plan") return true;
+  if (method === "POST" && /^\/growth\/(weeks\/suggest|checkins|experiments|rewards\/read|followers\/read)$/.test(pathname)) return true;
+  if (method === "PUT" && /^\/growth\/(milestones\/[0-9]+|weeks\/[a-f0-9]{32}|experiments\/[a-f0-9]{32}|relationships\/[A-Za-z0-9_]{1,15})$/.test(pathname)) return true;
   if (
     method === "GET" &&
     /^\/persona-imports(?:\/(?:preflight|[a-f0-9]{32}(?:\/export)?))?$/.test(

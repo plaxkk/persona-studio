@@ -7,6 +7,7 @@ import {
   Library,
   Settings,
   ClipboardCheck,
+  TrendingUp,
   Telescope,
   ScanFace,
   GitCommitHorizontal,
@@ -41,6 +42,7 @@ import InboxPage from "./pages/Inbox";
 import Compose from "./pages/Compose";
 import History from "./pages/History";
 import WeeklyReport from "./pages/WeeklyReport";
+import GrowthPlan from "./pages/GrowthPlan";
 import Benchmarks from "./pages/Benchmarks";
 import Accounts from "./pages/Accounts";
 import AlgorithmLog from "./pages/AlgorithmLog";
@@ -56,6 +58,7 @@ const nav: { id: Page; label: string; icon: typeof House }[] = [
   { id: "accounts", label: "账号观察", icon: ScanFace },
   { id: "algorithm", label: "算法更新", icon: GitCommitHorizontal },
   { id: "reports", label: "每周诊断", icon: ClipboardCheck },
+  { id: "growth", label: "成长计划", icon: TrendingUp },
   { id: "settings", label: "设置", icon: Settings },
 ];
 export default function App() {
@@ -481,6 +484,8 @@ export default function App() {
               <AlgorithmLog actions={actions} />
             ) : page === "reports" ? (
               <WeeklyReport data={data} actions={actions} />
+            ) : page === "growth" ? (
+              <GrowthPlan actions={actions} />
             ) : (
               <SettingsPage data={data} actions={actions} />
             )}

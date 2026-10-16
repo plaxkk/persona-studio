@@ -198,3 +198,59 @@ def sync_one_overview_run(store, *, environ=None, client=None, now=None):
                    (now, run["id"]))
     return {"status": "synced", "run_id": run["id"], "point_count": len(points),
             "gap_count": len(gaps)}
+
+
+def sync_one_growth_snapshot(store, *, kind="rewards", environ=None, client=None, now=None):
+    """Mirror one observed growth snapshot; retry without blocking local plans."""
+    if kind not in ("rewards", "followers"):
+        raise ValueError("unknown_growth_snapshot")
+    try:
+        url, key = _config(config_for_store(store) if environ is None else environ)
+    except SupabaseConfigError:
+        return {"status": "not_configured"}
+    now = int(time.time()) if now is None else int(now)
+    local, remote, ident = (
+        ("growth_reward_snapshots", "persona_growth_reward_snapshots", "id") if kind == "rewards"
+        else ("growth_follower_reads", "persona_growth_follower_reads", "task_id"))
+    with store.db(True) as db:
+        row = db.execute(
+            f"SELECT * FROM {local} WHERE (cloud_status IN ('pending','retry') "
+            "OR (cloud_status='sending' AND cloud_retry_at<=?)) "
+            "AND cloud_retry_at<=? ORDER BY observed_at LIMIT 1", (now, now)).fetchone()
+        if not row:
+            return {"status": "idle"}
+        item = dict(row)
+        db.execute(f"UPDATE {local} SET cloud_status='sending',cloud_retry_at=? WHERE {ident}=?",
+                   (now + 600, item[ident]))
+    if kind == "rewards":
+        payload = {"id": item["id"], "account": item["account"],
+                   "observed_at": item["observed_at"], "page_status": item["page_status"],
+                   "period": item["period"], "metrics": json.loads(item["metrics_json"]),
+                   "raw_payload": json.loads(item["raw_json"]), "source": item["source"]}
+    else:
+        payload = {"task_id": item["task_id"], "account": item["account"],
+                   "observed_at": item["observed_at"], "discovered": item["discovered"],
+                   "read_count": item["read_count"], "stopped_reason": item["stopped_reason"],
+                   "cumulative_bands": json.loads(item["bands_json"]),
+                   "exact_count": item["exact_count"],
+                   "verified_observed": item["verified_observed"]}
+    own_client = client is None
+    if own_client:
+        client = httpx.Client(timeout=20, follow_redirects=False)
+    try:
+        _post(client, url, key, remote, ident, [payload])
+    except (httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
+        code = str(exc) if isinstance(exc, RuntimeError) and re.fullmatch(r"http_\d{3}", str(exc)) else "network_or_data_error"
+        attempts = item["cloud_attempts"] + 1
+        retry_at = now + min(3600, 30 * 2 ** min(attempts - 1, 7))
+        with store.db(True) as db:
+            db.execute(f"UPDATE {local} SET cloud_status='retry',cloud_attempts=?,cloud_retry_at=?,cloud_error=? WHERE {ident}=?",
+                       (attempts, retry_at, code, item[ident]))
+        return {"status": "retry", "kind": kind, "error": code, "retry_at": retry_at}
+    finally:
+        if own_client:
+            client.close()
+    with store.db(True) as db:
+        db.execute(f"UPDATE {local} SET cloud_status='synced',cloud_synced_at=?,cloud_retry_at=0,cloud_error='' WHERE {ident}=?",
+                   (now, item[ident]))
+    return {"status": "synced", "kind": kind, "id": item[ident]}

@@ -1560,6 +1560,34 @@ input[type="checkbox"] {
 .spaced {
   margin-top: 27px;
 }
+.growth-milestones,
+.growth-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.growth-milestone,
+.growth-action,
+.growth-log > div,
+.growth-publications {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fbfcf8;
+}
+.growth-milestone strong,
+.growth-milestone small {
+  display: block;
+}
+.growth-milestone strong { font-size: 20px; }
+.growth-action { margin: 16px 0; }
+.growth-action h3 { margin-bottom: 10px; }
+.growth-action .field,
+.growth-fields .field { min-width: 0; }
+.growth-log { display: grid; gap: 10px; margin-top: 16px; }
+.growth-log p { margin: 6px 0; }
+.growth-log a { margin-left: 8px; }
 .post-top {
   display: flex;
   align-items: center;

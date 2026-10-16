@@ -12,6 +12,7 @@ from .inspiration import collect_work
 from .sync_status import failed as sync_failed
 from .browser_reads import BrowserReads
 from .analytics_browser_reads import AnalyticsBrowserReads
+from .growth_browser_reads import GrowthBrowserReads
 from .interactions import candidate_ids, reply_block
 from .weekly import generate as generate_weekly, last_complete_week
 from .weekly import timezone as weekly_timezone
@@ -159,7 +160,7 @@ class Jobs:
                 status = (
                     "cancelled"
                     if row["cancel"]
-                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview", "weekly", "benchmark", "deconstruct", "account_quality", "algorithm_check") else "failed")
+                    else ("queued" if row["kind"] in ("sync", "context", "metric", "profile_metric", "analytics_content", "analytics_overview", "growth_rewards", "growth_followers", "weekly", "benchmark", "deconstruct", "account_quality", "algorithm_check") else "failed")
                 )
                 c.execute(
                     "UPDATE tasks SET status=?,error=?,updated=? WHERE id=?",
@@ -330,6 +331,14 @@ class Jobs:
                                  automatic=True, dedupe=key)
                 except JobError:
                     pass
+        if browser.connected((1, 4, 5)):
+            key = 'growth-rewards'
+            latest = self.store.rows("SELECT status,error,created FROM tasks WHERE dedupe=? ORDER BY created DESC,id DESC LIMIT 1", (key,))
+            last = latest[0] if latest else None
+            interval = 3600 if last and last['status'] == 'failed' else 86400
+            if not last or (last['status'] not in ('queued', 'running') and now - last['created'] >= interval):
+                try: self.enqueue('growth_rewards', {}, automatic=True, dedupe=key)
+                except JobError: pass
         day = datetime.now(ZoneInfo(self.store.get('timezone','Asia/Shanghai'))).date().isoformat()
         if not self.store.rows("SELECT id FROM profile_snapshots WHERE account=? AND day=? LIMIT 1",(account,day)):
             key = 'profile:' + day
@@ -868,6 +877,7 @@ class Jobs:
                 BrowserReads(self.store).benchmark(job, self.alive) if job["kind"] == "benchmark" else
                 BrowserReads(self.store).quality(job, self.alive) if job["kind"] == "account_quality" else
                 AnalyticsBrowserReads(self.store).read(job, self.alive) if job["kind"] in ("analytics_content", "analytics_overview") else
+                GrowthBrowserReads(self.store).read(job, self.alive) if job["kind"] in ("growth_rewards", "growth_followers") else
                 self.weekly(job) if job["kind"] == "weekly" else
                 self.deconstruct(job) if job["kind"] == "deconstruct" else
                 self.algorithm_check(job) if job["kind"] == "algorithm_check" else

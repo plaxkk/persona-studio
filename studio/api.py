@@ -1442,6 +1442,8 @@ def create_app(state_dir=None, public_url=None):
     register_accounts(app, store, jobs, session)
     from .algorithm_routes import register as register_algorithm
     register_algorithm(app, store, jobs, session)
+    from .growth_routes import register as register_growth
+    register_growth(app, store, jobs, session)
 
     static = ROOT / "assets/web-admin/dist"
     if (static / "assets").exists():

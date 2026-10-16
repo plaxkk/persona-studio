@@ -10,6 +10,7 @@ const names = [
   "persona-browser.js",
   "result-chunks.js",
   "analytics-browser.js",
+  "growth-browser.js",
   "analytics-capture.js",
   "search-browser.js",
   "search-capture.js",

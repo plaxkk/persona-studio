@@ -588,6 +588,97 @@ class Store:
                 # letting them crowd the active writing queue.
                 c.execute("ALTER TABLE creations ADD COLUMN archived_at INTEGER")
                 c.execute("INSERT INTO migrations VALUES(14,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=15").fetchone():
+                c.executescript("""
+                CREATE TABLE growth_milestones(
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    target INTEGER NOT NULL UNIQUE, deadline TEXT,
+                    start_followers INTEGER, started_at INTEGER,
+                    completed_at INTEGER, created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL);
+                CREATE TABLE growth_week_plans(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL,
+                    week_start TEXT NOT NULL, status TEXT NOT NULL,
+                    source_report_id TEXT, created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    UNIQUE(account,week_start));
+                CREATE TABLE growth_actions(
+                    id TEXT PRIMARY KEY, plan_id TEXT NOT NULL REFERENCES growth_week_plans(id),
+                    position INTEGER NOT NULL, title TEXT NOT NULL,
+                    problem TEXT NOT NULL DEFAULT '', measure TEXT NOT NULL DEFAULT '',
+                    effort TEXT NOT NULL DEFAULT '', evidence TEXT NOT NULL DEFAULT '',
+                    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+                    UNIQUE(plan_id,position));
+                CREATE TABLE growth_checkins(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL, day TEXT NOT NULL,
+                    action_id TEXT REFERENCES growth_actions(id), kind TEXT NOT NULL,
+                    note TEXT NOT NULL DEFAULT '', publication_id TEXT REFERENCES draft_publications(draft_id),
+                    minutes INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+                CREATE INDEX growth_checkins_day ON growth_checkins(account,day);
+                """)
+                stamp = int(time.time())
+                for target in (500, 1000, 3000, 5000, 10000):
+                    c.execute("INSERT INTO growth_milestones(target,created_at,updated_at) VALUES(?,?,?)",
+                              (target, stamp, stamp))
+                old_goal = c.execute("SELECT target_followers FROM growth_goals WHERE id=1").fetchone()
+                if old_goal and old_goal[0] not in (500, 1000, 3000, 5000, 10000):
+                    c.execute("INSERT OR IGNORE INTO growth_milestones(target,created_at,updated_at) VALUES(?,?,?)",
+                              (old_goal[0], stamp, stamp))
+                c.execute("INSERT INTO migrations VALUES(15,?)", (stamp,))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=16").fetchone():
+                c.executescript("""
+                CREATE TABLE growth_browser_reads(
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id),
+                    account TEXT NOT NULL, kind TEXT NOT NULL,
+                    status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}',
+                    updated INTEGER NOT NULL);
+                CREATE TABLE growth_reward_snapshots(
+                    id TEXT PRIMARY KEY, account TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL, page_status TEXT NOT NULL,
+                    period TEXT, metrics_json TEXT NOT NULL,
+                    raw_json TEXT NOT NULL, source TEXT NOT NULL,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE INDEX growth_rewards_time ON growth_reward_snapshots(account,observed_at DESC);
+                CREATE TABLE growth_observed_followers(
+                    account TEXT NOT NULL, handle TEXT NOT NULL,
+                    followers INTEGER, followers_display TEXT,
+                    verified INTEGER, observed_at INTEGER NOT NULL,
+                    source TEXT NOT NULL, PRIMARY KEY(account,handle));
+                CREATE TABLE growth_follower_reads(
+                    task_id TEXT PRIMARY KEY REFERENCES tasks(id), account TEXT NOT NULL,
+                    observed_at INTEGER NOT NULL, discovered INTEGER NOT NULL,
+                    read_count INTEGER NOT NULL, stopped_reason TEXT NOT NULL,
+                    bands_json TEXT NOT NULL DEFAULT '{}',
+                    exact_count INTEGER NOT NULL DEFAULT 0,
+                    verified_observed INTEGER NOT NULL DEFAULT 0,
+                    cloud_status TEXT NOT NULL DEFAULT 'pending',
+                    cloud_attempts INTEGER NOT NULL DEFAULT 0,
+                    cloud_retry_at INTEGER NOT NULL DEFAULT 0,
+                    cloud_error TEXT NOT NULL DEFAULT '', cloud_synced_at INTEGER);
+                CREATE TABLE growth_relationship_notes(
+                    account TEXT NOT NULL, handle TEXT NOT NULL,
+                    note TEXT NOT NULL, interaction_url TEXT,
+                    next_step TEXT NOT NULL, updated_at INTEGER NOT NULL,
+                    PRIMARY KEY(account,handle));
+                """)
+                c.execute("INSERT INTO migrations VALUES(16,?)", (int(time.time()),))
+            if not c.execute("SELECT 1 FROM migrations WHERE version=17").fetchone():
+                # Connector 1.4.4 could mistake a still-loading followers page
+                # for a successful empty sample. Keep the attempt for audit,
+                # but remove it from coverage and cloud-delivery claims.
+                c.execute("UPDATE growth_follower_reads SET stopped_reason='invalid_empty_read',"
+                          "cloud_status='skip',cloud_error='' WHERE discovered=0 AND read_count=0 "
+                          "AND stopped_reason!='explicit_empty'")
+                c.execute("UPDATE tasks SET status='failed',error='source_error' "
+                          "WHERE id IN (SELECT task_id FROM growth_follower_reads "
+                          "WHERE stopped_reason='invalid_empty_read')")
+                c.execute("UPDATE growth_browser_reads SET result='{\"state\":\"source_error\"}' "
+                          "WHERE task_id IN (SELECT task_id FROM growth_follower_reads "
+                          "WHERE stopped_reason='invalid_empty_read')")
+                c.execute("INSERT INTO migrations VALUES(17,?)", (int(time.time()),))
         self.path.chmod(0o600)
 
     def get(self, key, default=None):

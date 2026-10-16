@@ -202,6 +202,7 @@ export type Page =
   | "accounts"
   | "algorithm"
   | "reports"
+  | "growth"
   | "settings";
 export type Actions = {
   refresh: () => Promise<void>;
