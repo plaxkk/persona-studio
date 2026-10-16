@@ -331,7 +331,7 @@ class Jobs:
                                  automatic=True, dedupe=key)
                 except JobError:
                     pass
-        if browser.connected((1, 4, 5)):
+        if browser.connected((1, 4, 6)):
             key = 'growth-rewards'
             latest = self.store.rows("SELECT status,error,created FROM tasks WHERE dedupe=? ORDER BY created DESC,id DESC LIMIT 1", (key,))
             last = latest[0] if latest else None

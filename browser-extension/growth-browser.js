@@ -22,14 +22,16 @@ function readFollowerCards() {
   if (!/^\/[A-Za-z0-9_]{1,15}\/followers$/.test(location.pathname))
     return { state: "source_error" };
   const primary = document.querySelector("main [data-testid='primaryColumn']") || document.querySelector("main");
-  if (!primary) return { state: "waiting_browser" };
+  if (!primary) return { state: "waiting_browser", hint: "no_main" };
   const cards = [...primary.querySelectorAll('[data-testid="UserCell"]')];
   if (!cards.length) {
     const empty = primary.querySelector('[data-testid="emptyState"]');
     const emptyText = empty?.innerText || "";
     if (/no followers|没有粉丝|暂无粉丝/i.test(emptyText))
       return { state: "ready", handles: [], empty: true };
-    return { state: "waiting_browser" };
+    if (/something went wrong|try reloading|出了点问题|重新加载/i.test(primary.innerText))
+      return { state: "source_error", hint: "x_page_error" };
+    return { state: "waiting_browser", hint: "no_cards" };
   }
   const handles = cards.map((card) => {
     const link = [...card.querySelectorAll("a[href]")].find((node) =>
@@ -37,11 +39,12 @@ function readFollowerCards() {
     const handle = link?.getAttribute("href")?.slice(1) || "";
     return { handle, verified: !!card.querySelector('[data-testid="icon-verified"]') };
   }).filter((item) => handleOK(item.handle));
+  if (!handles.length) return { state: "waiting_browser", hint: "card_links" };
   return { state: "ready", handles };
 }
 
-async function openAccountTab(account, url, path) {
-  const tab = await chrome.tabs.create({ url, active: false });
+async function openAccountTab(account, url, path, foreground = false) {
+  const tab = await chrome.tabs.create({ url, active: foreground });
   for (let n = 0; n < 40; n++) {
     const current = await chrome.tabs.get(tab.id);
     if (current.status === "complete") {
@@ -53,10 +56,10 @@ async function openAccountTab(account, url, path) {
       if (state === "ready") return { tab };
       if (state === "account_mismatch" || state === "waiting_login") return { tab, error: state };
     }
-    if (n === 7) await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+    if (n === 7 && !foreground) await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
     await delay(500);
   }
-  return { tab, error: "waiting_browser" };
+  return { tab, error: "waiting_browser", hint: "identity" };
 }
 
 export async function operateGrowthRewards(action) {
@@ -90,16 +93,18 @@ export async function operateGrowthFollowers(action) {
   try {
     previous = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
     const path = `/${account}/followers`;
-    const opened = await openAccountTab(account, `https://x.com${path}`, path);
+    const opened = await openAccountTab(account, `https://x.com${path}`, path, true);
     tab = opened.tab;
-    if (opened.error) return { state: opened.error };
+    if (opened.error) return { state: opened.error, hint: opened.hint || "open" };
     const found = new Map();
     let stalled = 0;
     let empty = false;
+    let lastHint = "no_cards";
     for (let n = 0; n < 15 && found.size < 180; n++) {
       const read = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "ISOLATED",
         func: readFollowerCards });
       const result = read[0]?.result || { state: "waiting_browser" };
+      if (result.hint) lastHint = result.hint;
       if (result.state === "ready") {
         if (result.empty) { empty = true; break; }
         const before = found.size;
@@ -113,7 +118,7 @@ export async function operateGrowthFollowers(action) {
         func: () => window.scrollBy(0, Math.max(window.innerHeight * 2, 900)) });
       await delay(700);
     }
-    if (!found.size && !empty) return { state: "waiting_browser" };
+    if (!found.size && !empty) return { state: "waiting_browser", hint: lastHint };
     const excluded = new Set(action.exclude.map((item) => item.toLowerCase()));
     const candidates = [...found.values()].filter((item) => !excluded.has(item.handle.toLowerCase())).slice(0, 12);
     const records = [];

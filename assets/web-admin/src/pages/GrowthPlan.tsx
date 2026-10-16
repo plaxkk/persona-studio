@@ -189,7 +189,7 @@ export default function GrowthPlan({ actions }: { actions: Actions }) {
           <small>{item.conclusion_ready ? `你的下一步决定：${item.decision}。这仍是方向性观察。` : "记录仅供观察；样本和时间不足时没有确定性结论。"}</small></div>)}
       </section>
       <section className="surface spaced">
-        <div className="section-title"><h2>原创奖励进度</h2><Badge>{state.browser_ready ? "可读取" : "需连接助手 1.4.5"}</Badge></div>
+        <div className="section-title"><h2>原创奖励进度</h2><Badge>{state.browser_ready ? "可读取" : "需连接助手 1.4.6"}</Badge></div>
         <p>X 目前实际显示什么，就记录什么。平台未给出的周期与收益规则保持未知；这一项不影响粉丝里程碑。</p>
         <Button disabled={!state.browser_ready || busy} onClick={() => void run(() => api("/growth/rewards/read", "POST", {}), "已加入奖励进度读取队列")}>读取奖励进度</Button>
         {state.rewards[0] ? <div className="growth-action">

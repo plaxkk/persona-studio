@@ -9,7 +9,7 @@ import time
 from .browser_reads import BrowserReads
 from .xreader import ReadError
 
-MINIMUM = (1, 4, 5)
+MINIMUM = (1, 4, 6)
 
 
 def reward_metrics(lines):
@@ -126,7 +126,11 @@ class GrowthBrowserReads:
                 if state in ("waiting_browser", "source_error") and retry < 2:
                     result, status, available = {"state": state, "_retry": retry + 1}, "queued", now + 10 * 2 ** retry
                 else:
-                    result, status, available = {"state": state}, "done", now
+                    hint = data.get("hint") if isinstance(data, dict) else None
+                    result = {"state": state}
+                    if hint in ("identity", "no_main", "no_cards", "card_links", "x_page_error", "open"):
+                        result["hint"] = hint
+                    result, status, available = result, "done", now
             else:
                 result, status, available = {"state": "ready", "summary": summary}, "done", now
             db.execute("UPDATE growth_browser_reads SET status=?,result=?,updated=? WHERE task_id=?",
