@@ -147,7 +147,11 @@ def register(app, store, session, allowed_hosts):
                 await ws.send_json({"action": action})
                 chunks = ResultChunks(action["id"]) if action else None
                 while True:
-                    msg = await asyncio.wait_for(ws.receive_json(), 40)
+                    # A follower sample opens up to twelve profiles. Keep its
+                    # in-flight socket open through the bounded 300s job; the
+                    # usual 40s idle/read timeout remains for other actions.
+                    timeout = 330 if action and action.get("kind") == "growth_followers_read" else 40
+                    msg = await asyncio.wait_for(ws.receive_json(), timeout)
                     if len(json.dumps(msg)) > 950000:
                         await ws.close(code=1009)
                         return
