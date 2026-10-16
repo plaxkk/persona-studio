@@ -38,7 +38,8 @@ function readFollowerCards() {
       /^\/[A-Za-z0-9_]{1,15}$/.test(node.getAttribute("href") || ""));
     const handle = link?.getAttribute("href")?.slice(1) || "";
     return { handle, verified: !!card.querySelector('[data-testid="icon-verified"]') };
-  }).filter((item) => handleOK(item.handle));
+  // executeScript serializes this function without its module-level closure.
+  }).filter((item) => /^[A-Za-z0-9_]{1,15}$/.test(item.handle));
   if (!handles.length) return { state: "waiting_browser", hint: "card_links" };
   return { state: "ready", handles };
 }

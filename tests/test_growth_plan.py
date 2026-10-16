@@ -95,7 +95,7 @@ def test_reward_failure_keeps_history_and_follower_bands_are_cumulative(tmp_path
         store = app.state.store
         stamp = int(time.time())
         with store.db(True) as db:
-            db.execute("INSERT INTO persona_browser_presence VALUES(1,'1.4.7',?)", (stamp,))
+            db.execute("INSERT INTO persona_browser_presence VALUES(1,'1.4.8',?)", (stamp,))
             for ident, kind in (("a" * 32, "rewards"), ("b" * 32, "followers")):
                 db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) "
                            "VALUES(?,?,?,'running',?,?,?)",

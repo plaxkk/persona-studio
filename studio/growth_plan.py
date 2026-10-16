@@ -205,7 +205,7 @@ def overview(store):
                                "WHERE lower(n.account)=lower(?) ORDER BY n.updated_at DESC LIMIT 100",
                                (account,)) if account else []
     from .browser_reads import BrowserReads
-    ready = BrowserReads(store).connected((1, 4, 7))
+    ready = BrowserReads(store).connected((1, 4, 8))
     read_tasks = store.rows("SELECT kind,status,error,created FROM tasks "
                             "WHERE kind IN ('growth_rewards','growth_followers') "
                             "ORDER BY created DESC LIMIT 10")

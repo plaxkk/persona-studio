@@ -9,7 +9,7 @@ import time
 from .browser_reads import BrowserReads
 from .xreader import ReadError
 
-MINIMUM = (1, 4, 7)
+MINIMUM = (1, 4, 8)
 
 
 def reward_metrics(lines):

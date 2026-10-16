@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import { operateGrowthFollowers } from '../browser-extension/growth-browser.js';
 
 test('an already-loaded X followers page supplies a sample without changing that tab', async () => {
@@ -18,7 +19,16 @@ test('an already-loaded X followers page supplies a sample without changing that
       executeScript: async ({ target, func, args }) => {
         if (func.name === 'readFollowerCards') {
           assert.equal(target.tabId, 1);
-          return [{ result: { state: 'ready', handles: [{ handle: 'reader', verified: true }] } }];
+          const card = {
+            querySelectorAll: () => [{ getAttribute: () => '/reader' }],
+            querySelector: () => ({}),
+          };
+          const primary = { querySelectorAll: () => [card] };
+          const result = vm.runInNewContext(`(${func.toString()})()`, {
+            location: { pathname: '/kkplayit/followers' },
+            document: { querySelector: () => primary },
+          });
+          return [{ result }];
         }
         if (args?.[0]?.kind === 'identity') return [{ result: { state: 'ready' } }];
         return [{ result: { state: 'ready', handle: 'reader',
