@@ -1,3 +1,4 @@
+import asyncio
 import time
 import json
 
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 from studio.api import create_app
 from studio.desktop import desktop_route
 from studio.growth_browser_reads import GrowthBrowserReads, reward_metrics
+from studio.browser_reads import BrowserReads
 from studio.supabase_analytics import sync_one_growth_snapshot
 
 
@@ -148,6 +150,44 @@ def test_new_growth_browser_routes_reject_unknown_methods():
                          ("PUT", "/growth/relationships/lifesinger")):
         assert desktop_route("/api/v1" + path, method)
     assert not desktop_route("/api/v1/growth/rewards/read", "GET")
+
+
+def test_dispatched_follower_read_can_finish_after_presence_lease_expires(tmp_path, monkeypatch):
+    app, client = _client(tmp_path)
+    try:
+        store = app.state.store
+        task_id = "d" * 32
+        stamp = int(time.time())
+        with store.db(True) as db:
+            db.execute("INSERT INTO tasks(id,kind,payload,status,created,updated,available) "
+                       "VALUES(?,'growth_followers','{}','running',?,?,?)",
+                       (task_id, stamp, stamp, stamp))
+        calls = 0
+
+        def connected(_self, _minimum):
+            nonlocal calls
+            calls += 1
+            return calls == 1
+
+        monkeypatch.setattr(BrowserReads, "connected", connected)
+        reader = GrowthBrowserReads(store)
+
+        async def run():
+            pending = asyncio.create_task(reader.read({"id": task_id, "kind": "growth_followers"},
+                                                      lambda _job: True))
+            await asyncio.sleep(0.01)
+            with store.db(True) as db:
+                db.execute("UPDATE growth_browser_reads SET status='sent' WHERE task_id=?", (task_id,))
+            reader.receive("growth:" + task_id, {"state": "ready", "account": "kkplayit",
+                "discovered": 1, "stopped_reason": "bounded_sample", "records": [
+                    {"handle": "reader", "followers": 1200, "followers_display": "1,200 Followers",
+                     "verified": False}]})
+            return await pending
+
+        assert asyncio.run(run())["read_count"] == 1
+        assert calls == 1
+    finally:
+        client.__exit__(None, None, None)
 
 
 def test_false_empty_follower_read_is_removed_from_coverage_on_migration(tmp_path):

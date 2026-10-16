@@ -161,7 +161,8 @@ class GrowthBrowserReads:
                     return result["summary"]
                 raise ReadError(result.get("state") if result.get("state") in
                                 ("waiting_login", "account_mismatch") else "source_error")
-            if not BrowserReads(self.store).connected(MINIMUM):
-                raise ReadError("browser_offline")
+            # A bounded follower read may keep the extension busy longer than
+            # the 45-second presence lease. Once dispatched, wait for its
+            # result or this task's deadline instead of reporting it offline.
             await asyncio.sleep(1)
         raise ReadError("timeout")
